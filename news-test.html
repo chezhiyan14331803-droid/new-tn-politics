@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>News API Test</title>
+</head>
+
+<body>
+
+    <h1>Latest News</h1>
+
+    <div id="newsContainer">
+        Loading news...
+    </div>
+
+    <script src="news-api.js"></script>
+
+    <script>
+
+        async function showNews() {
+
+            const news = await getLatestNews();
+
+            const container =
+                document.getElementById("newsContainer");
+
+            if (news.length === 0) {
+
+                container.innerHTML =
+                    "<p>No news found.</p>";
+
+                return;
+            }
+
+            container.innerHTML = "";
+
+            news.forEach(function(item) {
+
+                const article =
+                    document.createElement("article");
+
+                article.innerHTML = `
+                    <h2>${item.title}</h2>
+
+                    <p>
+                        ${item.description || ""}
+                    </p>
+
+                    <p>
+                        Source:
+                        ${item.source_name || "Unknown"}
+                    </p>
+
+                    <p>
+                        ${item.pubDate || ""}
+                    </p>
+
+                    <a
+                        href="${item.link}"
+                        target="_blank">
+                        Read Full Article →
+                    </a>
+
+                    <hr>
+                `;
+
+                container.appendChild(article);
+
+            });
+
+        }
+
+        showNews();
+
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>Previous News | New TN Politics</title>
+
+    <link rel="stylesheet" href="style.css">
+
+</head>
+
+
+<body>
+
+
+<!-- HEADER -->
+
+<header class="header">
+
+    <div class="logo">
+        <span>NEW TN</span>
+        <strong>POLITICS</strong>
+    </div>
+
+
+    <nav class="navbar">
+
+        <a href="index.html">
+            Home
+        </a>
+
+        <a href="reader.html">
+            Today's News
+        </a>
+
+        <a href="archive.html">
+            Previous News
+        </a>
+
+        <a href="admin.html">
+            Admin
+        </a>
+
+    </nav>
+
+
+    <button class="search-button"
+            onclick="openSearch()">
+
+        🔍 Search
+
+    </button>
+
+</header>
+
+
+
+<!-- PAGE -->
+
+<main class="archive-page">
+
+
+    <div class="archive-container">
+
+
+        <!-- HEADING -->
+
+        <div class="archive-heading">
+
+            <p class="section-label">
+                NEW TN POLITICS
+            </p>
+
+            <h1>
+                Previous News
+            </h1>
+
+            <p>
+                Browse previously published daily news.
+            </p>
+
+        </div>
+
+
+
+        <!-- FILTER -->
+
+        <div class="archive-filter">
+
+            <label for="archiveCategory">
+                Category
+            </label>
+
+            <select id="archiveCategory">
+
+                <option value="all">
+                    All Categories
+                </option>
+
+                <option value="Tamil Nadu">
+                    Tamil Nadu
+                </option>
+
+                <option value="India">
+                    India
+                </option>
+
+                <option value="World">
+                    World
+                </option>
+
+                <option value="Politics">
+                    Politics
+                </option>
+
+                <option value="Sports">
+                    Sports
+                </option>
+
+                <option value="Technology">
+                    Technology
+                </option>
+
+                <option value="Education">
+                    Education
+                </option>
+
+                <option value="Business">
+                    Business
+                </option>
+
+            </select>
+
+        </div>
+
+
+
+        <!-- NEWS GRID -->
+
+        <div class="archive-grid"
+             id="archiveGrid">
+
+            <!-- News will appear here -->
+
+        </div>
+
+
+    </div>
+
+</main>
+
+
+
+<!-- FOOTER -->
+
+<footer class="footer">
+
+    <div class="logo">
+
+        <span>NEW TN</span>
+        <strong>POLITICS</strong>
+
+    </div>
+
+    <p>
+        Your daily source for news and updates.
+    </p>
+
+    <p class="copyright">
+        © 2026 New TN Politics. All rights reserved.
+    </p>
+
+</footer>
+
+
+
+<!-- SEARCH POPUP -->
+
+<div class="search-popup"
+     id="searchPopup">
+
+    <div class="search-box">
+
+        <button class="close-search"
+                onclick="closeSearch()">
+
+            ×
+
+        </button>
+
+        <h2>
+            Search News
+        </h2>
+
+        <input
+            type="text"
+            placeholder="Search for news..."
+            id="searchInput"
+        >
+
+        <button onclick="searchNews()">
+            Search
+        </button>
+
+    </div>
+
+</div>
+
+
+
+<script src="script.js"></script>
+<script type="module" src="archive-news.js"></script>
+</body>
+
+</html>

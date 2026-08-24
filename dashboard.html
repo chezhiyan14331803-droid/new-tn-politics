@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>Admin Dashboard | New TN Politics</title>
+
+    <link rel="stylesheet" href="style.css">
+
+</head>
+
+
+<body>
+
+    <!-- HEADER -->
+
+    <header class="header">
+
+        <div class="logo">
+            <span>NEW TN</span>
+            <strong>POLITICS</strong>
+        </div>
+
+        <nav class="navbar">
+
+            <a href="index.html">
+                Home
+            </a>
+
+            <a href="reader.html">
+                Today's News
+            </a>
+            <a href="#" id="logoutButton">
+                   Logout
+            </a>
+
+        </nav>
+
+    </header>
+
+
+    <!-- DASHBOARD -->
+
+    <main class="dashboard-page">
+
+        <div class="dashboard-container">
+
+            <!-- TITLE -->
+
+            <div class="dashboard-heading">
+
+                <p class="section-label">
+                    ADMINISTRATION
+                </p>
+
+                <h1>
+                    Dashboard
+                </h1>
+
+                <p>
+                    Manage your daily news publications.
+                </p>
+
+            </div>
+
+
+            <!-- STAT CARDS -->
+
+            <div class="dashboard-stats">
+
+                <div class="stat-card">
+
+                    <span class="stat-number">
+                        0
+                    </span>
+
+                    <span class="stat-title">
+                        Published News
+                    </span>
+
+                </div>
+
+
+                <div class="stat-card">
+
+                    <span class="stat-number">
+                        0
+                    </span>
+
+                    <span class="stat-title">
+                        PDFs
+                    </span>
+
+                </div>
+
+
+                <div class="stat-card">
+
+                    <span class="stat-number">
+                        2026
+                    </span>
+
+                    <span class="stat-title">
+                        Current Year
+                    </span>
+
+                </div>
+
+            </div>
+
+
+            <!-- UPLOAD SECTION -->
+
+            <section class="upload-section">
+
+                <div class="upload-heading">
+
+                    <p class="section-label">
+                        NEW PUBLICATION
+                    </p>
+
+                    <h2>
+                        Publish Today's News
+                    </h2>
+
+                </div>
+
+
+                <form id="publishForm">
+
+
+                    <!-- PDF -->
+
+                    <!-- GOOGLE DRIVE PDF LINK -->
+
+                    <div class="form-group">
+
+                     <label for="newsPdfUrl">
+                       Google Drive PDF Link
+                     </label>
+
+                     <input
+                       type="url"
+                       id="newsPdfUrl"
+                       placeholder="Paste the Google Drive sharing link"
+                       required>
+
+                     <p>
+                       Upload the PDF to Google Drive and set access to “Anyone with the link”.
+                     </p>
+
+                    </div>
+
+
+                    <!-- TITLE -->
+
+                    <div class="form-group">
+
+                        <label for="newsTitle">
+                            News Title
+                        </label>
+
+                        <input
+                            type="text"
+                            id="newsTitle"
+                            placeholder="Example: New TN Politics — Today's News"
+                            required>
+
+                    </div>
+
+
+                    <!-- DATE -->
+
+                    <div class="form-group">
+
+                        <label for="newsDate">
+                            Publication Date
+                        </label>
+
+                        <input
+                            type="date"
+                            id="newsDate"
+                            required>
+
+                    </div>
+
+
+                    <!-- CATEGORY -->
+
+                    <div class="form-group">
+
+                        <label for="newsCategory">
+                            Category
+                        </label>
+
+                        <select id="newsCategory"
+                                required>
+
+                            <option value="">
+                                Select category
+                            </option>
+
+                            <option value="politics">
+                                Politics
+                            </option>
+
+                            <option value="tamil-nadu">
+                                Tamil Nadu
+                            </option>
+
+                            <option value="india">
+                                India
+                            </option>
+
+                            <option value="world">
+                                World
+                            </option>
+
+                            <option value="sports">
+                                Sports
+                            </option>
+
+                            <option value="technology">
+                                Technology
+                            </option>
+
+                            <option value="education">
+                                Education
+                            </option>
+
+                            <option value="business">
+                                Business
+                            </option>
+
+                        </select>
+
+                    </div>
+
+
+                    <!-- DESCRIPTION -->
+
+                    <div class="form-group">
+
+                        <label for="newsDescription">
+                            Short Description
+                        </label>
+
+                        <textarea
+                            id="newsDescription"
+                            rows="4"
+                            placeholder="Write a short description of today's news..."></textarea>
+
+                    </div>
+
+
+                    <!-- PUBLISH -->
+
+                    <button
+                        type="submit"
+                        class="publish-button">
+
+                        Publish News
+
+                    </button>
+
+
+                    <p id="publishMessage"
+                       class="publish-message">
+                    </p>
+
+
+                </form>
+
+            </section>
+
+
+            <!-- RECENT PUBLICATIONS -->
+
+            <section class="recent-section">
+
+                <div class="section-heading">
+
+                    <div>
+
+                        <p class="section-label">
+                            ARCHIVE
+                        </p>
+
+                        <h2>
+                            Recent Publications
+                        </h2>
+
+                    </div>
+
+                </div>
+
+
+                <div class="publication-list">
+
+
+                    <div class="publication-item">
+
+                        <div>
+
+                            <strong>
+                                New TN Politics — Today's News
+                            </strong>
+
+                            <p>
+                                August 8, 2026 · Politics
+                            </p>
+
+                        </div>
+
+
+                        <span class="published-badge">
+                            Published
+                        </span>
+
+                    </div>
+
+
+                </div>
+
+            </section>
+
+        </div>
+
+    </main>
+
+
+    <!-- FOOTER -->
+
+    <footer class="footer">
+
+        <div class="logo">
+
+            <span>NEW TN</span>
+            <strong>POLITICS</strong>
+
+        </div>
+
+        <p>
+            Admin Dashboard
+        </p>
+
+    </footer>
+
+
+    <script src="script.js"></script>
+    <script type="module" src="dashboard-auth.js"></script>
+    <script type="module" src="dashboard-publish.js"></script>
+    <script type="module" src="dashboard-stats.js"></script>
+
+</body>
+
+</html>

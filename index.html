@@ -1,0 +1,291 @@
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>New TN Politics</title>
+
+    <link rel="stylesheet" href="style.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background-color: #f4f6f8; /* Soft light gray background */
+            position: relative;
+            min-height: 100vh;
+        }
+
+        /* Centered Full Screen Image Container */
+        .fullscreen-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 0;
+            pointer-events: none; /* Allows clicking buttons on top */
+        }
+
+        /* The Seal Image Sizing and Fade */
+        .fullscreen-bg img {
+            width: min(500px, 80vw);
+            height: auto;
+            opacity: 0.15; /* Adjust faintness here (0.10 to 0.30) */
+            filter: grayscale(20%); /* Blends nicely with background */
+        }
+
+        /* Ensure website content stays above background */
+        
+
+        .hero {
+            display: flex;
+            align-items: center;
+            min-height: 80vh;
+            padding: 0 8%;
+        }
+
+        .hero-content {
+            max-width: 600px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="fullscreen-bg">
+        <img src="tnimage.png" alt="Tamil Nadu Seal">
+    </div>
+
+    <!-- Header -->
+    <header class="header">
+
+        <div class="logo">
+            <span>NEW TN</span>
+            <strong>POLITICS</strong>
+        </div>
+
+        <nav class="navbar">
+            <a href="admin.html">Admin</a>
+            <a href="#">Home</a>
+            <a href="#categories">Categories</a>
+            <a href="#previous">Previous News</a>
+        </nav>
+
+        <button class="search-button" onclick="openSearch()">
+            🔍 Search
+        </button>
+
+    </header>
+
+
+    <!-- Breaking News -->
+    <div class="breaking-news">
+
+        <div class="breaking-label">
+            BREAKING NEWS
+        </div>
+
+        <div class="breaking-text">
+            Latest news and updates from Tamil Nadu and around the world
+        </div>
+
+    </div>
+
+
+    <!-- Hero Section -->
+    <main>
+
+        <section class="hero">
+
+            <div class="hero-content">
+
+                <p class="small-title">YOUR DAILY NEWS SOURCE</p>
+
+                <h1>
+                    Stay Updated.<br>
+                    Stay Informed.
+                </h1>
+
+                <p class="hero-description">
+                    Get the latest news and important updates
+                    from Tamil Nadu, India and around the world.
+                </p>
+
+                <a href="reader.html" class="primary-button" id="heroReadButton">
+                    Read Today's News
+                </a>
+
+            </div>
+
+        </section>
+
+
+        <!-- Today's News -->
+        <section class="section" id="today">
+
+            <div class="section-heading">
+                <div>
+                    <p class="section-label">LATEST UPDATE</p>
+                    <h2>Today's News</h2>
+                </div>
+
+                <span class="date" id="homeSectionDate">
+                   Today's Date
+                </span>
+            </div>
+
+
+            <div class="today-card">
+
+                <div class="pdf-icon">
+                    PDF
+                </div>
+
+                <div class="today-info">
+
+                    <p class="news-date" id="homeNewsDate">
+                         Today's Date
+                    </p>
+
+                    <p class="news-category" id="homeNewsCategory">
+                         POLITICS
+                    </p>
+                    <h3 id="homeNewsTitle">
+                         New TN Politics — Today's News
+                    </h3>
+
+                    <p id="homeNewsDescription">
+                        Read the latest daily news from New TN Politics.
+                    </p>
+
+                    <div class="card-buttons">
+
+                        <a href="reader.html" class="read-button" id="homeReadButton">
+                            Read News
+                        </a>
+
+                        <button class="download-button">
+                            Download PDF
+                        </button>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- Previous News -->
+        <section class="section" id="previous">
+
+            <div class="section-heading">
+                <div>
+                    <p class="section-label">ARCHIVE</p>
+                    <h2>Previous News</h2>
+                </div>
+
+                <a href="archive.html" class="view-all">
+                   View All →
+                </a>
+            </div>
+
+
+            <div class="news-grid" id="previousNewsGrid">
+
+                 <!-- Previous news will be added automatically by JavaScript -->
+
+            </div>
+
+        </section>
+
+
+        <!-- Categories -->
+        <section class="section categories-section" id="categories">
+
+            <div class="section-heading">
+                <div>
+                    <p class="section-label">
+                      NEWS CATEGORIES
+                    </p>
+
+                    <h2>Categories</h2>
+                </div>
+            </div>
+
+
+            <div class="category-grid">
+
+                <button>Tamil Nadu</button>
+                <button>India</button>
+                <button>World</button>
+                <button>Politics</button>
+                <button>Sports</button>
+                <button>Technology</button>
+                <button>Education</button>
+                <button>Business</button>
+
+            </div>
+
+        </section>
+
+    </main>
+
+
+    <!-- Footer -->
+    <footer class="footer">
+
+        <div class="logo">
+            <span>NEW TN</span>
+            <strong>POLITICS</strong>
+        </div>
+
+        <p>
+            Your daily source for news and updates.
+        </p>
+
+        <p class="copyright">
+            © 2026 New TN Politics. All rights reserved.
+        </p>
+
+    </footer>
+
+
+    <!-- Search Popup -->
+    <div class="search-popup" id="searchPopup">
+
+        <div class="search-box">
+
+            <button class="close-search" onclick="closeSearch()">
+                ×
+            </button>
+
+            <h2>Search News</h2>
+
+            <input
+                type="text"
+                placeholder="Search for news..."
+                id="searchInput"
+            >
+
+            <button onclick="searchNews()">
+                Search
+            </button>
+
+        </div>
+
+    </div>
+
+
+    <script src="script.js"></script>
+    <script type="module" src="home-news.js"></script>
+
+</body>
+</html>
+```

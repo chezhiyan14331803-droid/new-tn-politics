@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>Today's News | New TN Politics</title>
+
+    <link rel="stylesheet" href="style.css">
+
+</head>
+
+
+<body>
+
+    <!-- HEADER -->
+
+    <header class="header">
+
+        <div class="logo">
+            <span>NEW TN</span>
+            <strong>POLITICS</strong>
+        </div>
+
+
+        <nav class="navbar">
+
+            <a href="index.html">Home</a>
+
+            <a href="index.html#categories">
+                Categories
+            </a>
+
+            <a href="index.html#previous">
+                Previous News
+            </a>
+
+        </nav>
+
+
+        <button class="search-button"
+                onclick="openSearch()">
+
+            🔍 Search
+
+        </button>
+
+    </header>
+
+
+    <!-- PAGE CONTENT -->
+
+    <main class="reader-page">
+
+
+        <!-- BACK BUTTON -->
+
+        <a href="index.html"
+           class="back-button">
+
+            ← Back to Home
+
+        </a>
+
+
+        <!-- NEWS TITLE -->
+
+        <div class="reader-heading">
+
+            <p class="section-label">
+                DAILY NEWS
+            </p>
+            <h1 id="readerTitle">
+               Loading news...
+            </h1>
+
+            <p class="reader-date" id="readerDate">
+                Loading news...
+            </p>
+
+            
+
+        </div>
+
+
+        <!-- PDF VIEWER -->
+
+        <div class="pdf-container">
+
+            <iframe
+              id="readerPdf"
+              title="Today's News PDF">
+            </iframe>
+
+        </div>
+
+
+        <!-- ACTION BUTTONS -->
+
+        <div class="reader-actions">
+
+            <a
+               id="readerDownload"
+               href="#"
+               target="_blank"
+               class="reader-download">
+
+               ↓ Download PDF
+
+            </a>
+
+
+            <button
+                onclick="shareNews()"
+                class="reader-share">
+
+                ↗ Share
+
+            </button>
+
+        </div>
+
+
+    </main>
+
+
+    <!-- FOOTER -->
+
+    <footer class="footer">
+
+        <div class="logo">
+
+            <span>NEW TN</span>
+            <strong>POLITICS</strong>
+
+        </div>
+
+        <p>
+            Your daily source for news and updates.
+        </p>
+
+        <p>
+            © 2026 New TN Politics.
+            All rights reserved.
+        </p>
+
+    </footer>
+
+
+    <!-- SEARCH POPUP -->
+
+    <div class="search-popup"
+         id="searchPopup">
+
+        <div class="search-box">
+
+            <button
+                class="close-search"
+                onclick="closeSearch()">
+
+                ×
+
+            </button>
+
+
+            <h2>
+                Search News
+            </h2>
+
+
+            <input
+                type="text"
+                id="searchInput"
+                placeholder="Search for news...">
+
+
+            <button onclick="searchNews()">
+
+                Search
+
+            </button>
+
+        </div>
+
+    </div>
+
+
+    <script src="script.js"></script>
+    <script type="module" src="reader-news.js"></script>
+
+</body>
+
+</html>
