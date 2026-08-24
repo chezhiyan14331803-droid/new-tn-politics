@@ -5,6 +5,7 @@ import {
   orderBy,
   query
 } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js";
+
 import { db } from "./firebase-config.js";
 
 const homeSectionDate = document.getElementById("homeSectionDate");
@@ -12,92 +13,179 @@ const homeNewsDate = document.getElementById("homeNewsDate");
 const homeNewsCategory = document.getElementById("homeNewsCategory");
 const homeNewsTitle = document.getElementById("homeNewsTitle");
 const homeNewsDescription = document.getElementById("homeNewsDescription");
+
 const heroReadButton = document.getElementById("heroReadButton");
 const homeReadButton = document.getElementById("homeReadButton");
 const previousNewsGrid = document.getElementById("previousNewsGrid");
 
 function formatDate(dateString) {
-  return new Date(`${dateString}T00:00:00`).toLocaleDateString(
+  if (!dateString) return "Date unavailable";
+
+  return new Date(dateString).toLocaleDateString(
     "en-IN",
-    { day: "numeric", month: "long", year: "numeric" }
+    {
+      day: "numeric",
+      month: "long",
+      year: "numeric"
+    }
   );
 }
 
 function categoryName(category) {
+  if (!category) return "News";
+
   return category
     .split("-")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .map(
+      word => word.charAt(0).toUpperCase() + word.slice(1)
+    )
     .join(" ");
 }
 
 async function loadHomeNews() {
+
+  // Show today's date
   homeSectionDate.textContent = new Date().toLocaleDateString(
     "en-IN",
-    { day: "numeric", month: "long", year: "numeric" }
+    {
+      day: "numeric",
+      month: "long",
+      year: "numeric"
+    }
   );
-  document.querySelectorAll(".category-grid button").forEach((button) => {
-  button.addEventListener("click", () => {
-    const category = button.textContent
-      .trim()
-      .toLowerCase()
-      .replace(/\s+/g, "-");
 
-    window.location.href =
-      `archive.html?category=${encodeURIComponent(category)}`;
-  });
-});
+  // Category buttons
+  document
+    .querySelectorAll(".category-grid button")
+    .forEach(button => {
+
+      button.addEventListener("click", () => {
+
+        const category = button.textContent
+          .trim()
+          .toLowerCase()
+          .replace(/\s+/g, "-");
+
+        window.location.href =
+          `archive.html?category=${encodeURIComponent(category)}`;
+      });
+
+    });
 
   try {
+
+    // Get latest automatic news
     const results = await getDocs(
       query(
-        collection(db, "news"),
-        orderBy("publicationDate", "desc"),
-        limit(4)
+        collection(db, "automaticNews"),
+        orderBy("publishedAt", "desc"),
+        limit(5)
       )
     );
 
-    const newsItems = results.docs.map((newsDocument) => ({
-      id: newsDocument.id,
-      ...newsDocument.data()
+    const newsItems = results.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
     }));
 
+    // No news
     if (newsItems.length === 0) {
-      homeNewsTitle.textContent = "No news published yet.";
-      homeNewsDescription.textContent = "Please check back later.";
+
+      homeNewsTitle.textContent =
+        "No automatic news available.";
+
+      homeNewsDescription.textContent =
+        "Please check back later.";
+
       return;
     }
 
+    // Latest news
     const latest = newsItems[0];
-    const readerLink = `reader.html?id=${latest.id}`;
 
-    homeNewsDate.textContent = formatDate(latest.publicationDate);
-    homeNewsCategory.textContent = categoryName(latest.category);
-    homeNewsTitle.textContent = latest.title;
-    homeNewsDescription.textContent = latest.description || "";
+    homeNewsDate.textContent =
+      formatDate(latest.publishedAt);
 
-    heroReadButton.href = readerLink;
-    homeReadButton.href = readerLink;
+    homeNewsCategory.textContent =
+      categoryName(latest.category);
 
+    homeNewsTitle.textContent =
+      latest.title;
+
+    homeNewsDescription.textContent =
+      latest.description || "";
+
+    // Open original news article
+    if (latest.sourceUrl) {
+
+      heroReadButton.href = latest.sourceUrl;
+      heroReadButton.target = "_blank";
+
+      homeReadButton.href = latest.sourceUrl;
+      homeReadButton.target = "_blank";
+    }
+
+    // Previous automatic news
     const previousNews = newsItems.slice(1);
 
-    previousNewsGrid.innerHTML = previousNews.length
-      ? previousNews.map((news) => `
-          <article class="publication-item">
-            <div>
-              <p class="news-category">${categoryName(news.category)}</p>
-              <strong>${news.title}</strong>
-              <p>${formatDate(news.publicationDate)}</p>
-            </div>
+    if (previousNews.length > 0) {
 
-            <a class="read-button" href="reader.html?id=${news.id}">
-              Read News
-            </a>
-          </article>
-        `).join("")
-      : "<p>No previous news yet.</p>";
+      previousNewsGrid.innerHTML =
+        previousNews
+          .map(news => `
+
+            <article class="publication-item">
+
+              <div>
+
+                <p class="news-category">
+                  ${categoryName(news.category)}
+                </p>
+
+                <strong>
+                  ${news.title}
+                </strong>
+
+                <p>
+                  ${formatDate(news.publishedAt)}
+                </p>
+
+                <small>
+                  Source: ${news.source || "Unknown"}
+                </small>
+
+              </div>
+
+              <a
+                class="read-button"
+                href="${news.sourceUrl || "#"}"
+                target="_blank"
+              >
+                Read News
+              </a>
+
+            </article>
+
+          `)
+          .join("");
+
+    } else {
+
+      previousNewsGrid.innerHTML =
+        "<p>No previous automatic news yet.</p>";
+
+    }
+
   } catch (error) {
-    homeNewsTitle.textContent = "Unable to load news.";
-    homeNewsDescription.textContent = "Please refresh and try again.";
+
+    console.error("Automatic news error:", error);
+
+    homeNewsTitle.textContent =
+      "Unable to load automatic news.";
+
+    homeNewsDescription.textContent =
+      "Please refresh and try again.";
+
   }
 }
 
