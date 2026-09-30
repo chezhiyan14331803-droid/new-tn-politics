@@ -1,5 +1,5 @@
 const admin = require("firebase-admin");
-
+console.log("🔥 CATEGORY VERSION 2 IS RUNNING 🔥");
 if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
   throw new Error("FIREBASE_SERVICE_ACCOUNT secret is missing.");
 }
