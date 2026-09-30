@@ -49,12 +49,22 @@
     </nav>
 
 
+    <div class="header-actions">
+
     <button class="search-button"
             onclick="openSearch()">
-
         🔍 Search
-
     </button>
+
+    <button
+        class="theme-button"
+        id="themeButton"
+        onclick="toggleDarkMode()"
+        aria-label="Toggle dark mode">
+        🌙
+    </button>
+
+</div>
 
 </header>
 
@@ -143,11 +153,19 @@
         <!-- NEWS GRID -->
 
         <div class="archive-grid"
-             id="archiveGrid">
+     id="archiveGrid">
 
-            <!-- News will appear here -->
+    <div class="archive-loading">
+        <div class="loading-spinner"></div>
 
-        </div>
+        <h3>Loading News...</h3>
+
+        <p>
+            Please wait while we fetch the latest news.
+        </p>
+    </div>
+
+</div>
 
 
     </div>

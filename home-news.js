@@ -8,48 +8,30 @@ import {
 
 import { db } from "./firebase-config.js";
 
-const homeSectionDate =
-  document.getElementById("homeSectionDate");
-
-const homeNewsDate =
-  document.getElementById("homeNewsDate");
-
-const homeNewsCategory =
-  document.getElementById("homeNewsCategory");
-
-const homeNewsTitle =
-  document.getElementById("homeNewsTitle");
-
-const homeNewsDescription =
-  document.getElementById("homeNewsDescription");
-
-const heroReadButton =
-  document.getElementById("heroReadButton");
-
-const homeReadButton =
-  document.getElementById("homeReadButton");
-
-const previousNewsGrid =
-  document.getElementById("previousNewsGrid");
-
+const homeSectionDate = document.getElementById("homeSectionDate");
+const homeNewsDate = document.getElementById("homeNewsDate");
+const homeNewsCategory = document.getElementById("homeNewsCategory");
+const homeNewsTitle = document.getElementById("homeNewsTitle");
+const homeNewsDescription = document.getElementById("homeNewsDescription");
+const heroReadButton = document.getElementById("heroReadButton");
+const homeReadButton = document.getElementById("homeReadButton");
+const previousNewsGrid = document.getElementById("previousNewsGrid");
 
 function formatDate(dateString) {
-
   if (!dateString) return "";
 
-  return new Date(dateString).toLocaleDateString(
-    "en-IN",
-    {
-      day: "numeric",
-      month: "long",
-      year: "numeric"
-    }
-  );
+  const date = new Date(dateString);
+
+  if (isNaN(date)) return dateString;
+
+  return date.toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "long",
+    year: "numeric"
+  });
 }
 
-
 function categoryName(category) {
-
   if (!category) return "News";
 
   return category
@@ -62,7 +44,25 @@ function categoryName(category) {
     .join(" ");
 }
 
+function createReaderLink(id) {
+  return `reader.html?type=automatic&id=${encodeURIComponent(id)}`;
+}
+function getCategoryIcon(category) {
 
+  const value =
+    String(category || "").toLowerCase();
+
+  if (value.includes("politics")) return "🏛️";
+  if (value.includes("sports")) return "🏏";
+  if (value.includes("technology")) return "💻";
+  if (value.includes("business")) return "💰";
+  if (value.includes("education")) return "🎓";
+  if (value.includes("world")) return "🌍";
+  if (value.includes("india")) return "🇮🇳";
+  if (value.includes("tamil")) return "📍";
+
+  return "📰";
+}
 function displayNews(newsItems) {
 
   if (newsItems.length === 0) {
@@ -76,92 +76,95 @@ function displayNews(newsItems) {
     return;
   }
 
-
-  // Latest news
   const latest = newsItems[0];
+  if (breakingNewsText) {
 
+  breakingNewsText.textContent =
+    latest.title || "Latest news available now";
+
+  breakingNewsText.style.cursor = "pointer";
+
+  breakingNewsText.onclick = () => {
+
+    window.location.href =
+      createReaderLink(latest.id);
+
+  };
+
+}
 
   homeNewsDate.textContent =
     formatDate(latest.publishedAt);
 
-
   homeNewsCategory.textContent =
-    categoryName(latest.category);
+  `${getCategoryIcon(latest.category)} ${categoryName(latest.category)}`;
 
+homeNewsTitle.textContent =
+  latest.title || "Latest News";
 
-  homeNewsTitle.textContent =
-    latest.title;
+homeNewsDescription.textContent =
+  latest.description || "Read the latest news.";
 
+  const latestReaderLink =
+    createReaderLink(latest.id);
 
-  homeNewsDescription.textContent =
-    latest.description || "";
+  heroReadButton.href = latestReaderLink;
+  homeReadButton.href = latestReaderLink;
 
+  heroReadButton.removeAttribute("target");
+  homeReadButton.removeAttribute("target");
 
-  // Open original news article
-  if (latest.sourceUrl) {
+  const previousNews = newsItems.slice(1);
 
-    heroReadButton.href =
-      latest.sourceUrl;
+  if (previousNews.length === 0) {
 
-    homeReadButton.href =
-      latest.sourceUrl;
+    previousNewsGrid.innerHTML =
+      "<p>No previous automatic news yet.</p>";
 
-    heroReadButton.target = "_blank";
-    homeReadButton.target = "_blank";
+    return;
   }
 
-
-  // Previous news
-  const previousNews =
-    newsItems.slice(1);
-
-
   previousNewsGrid.innerHTML =
-    previousNews.length
+    previousNews
+      .map(news => {
 
-      ? previousNews
-          .map(
-            news => `
+        const readerLink =
+          createReaderLink(news.id);
 
-              <article class="publication-item">
+        return `
+          <article class="publication-item">
 
-                <div>
+            <div>
 
-                  <p class="news-category">
-                    ${categoryName(news.category)}
-                  </p>
+              <p class="news-category">
+                ${categoryName(news.category)}
+              </p>
 
-                  <strong>
-                    ${news.title}
-                  </strong>
+              <strong>
+                ${news.title || "Latest News"}
+              </strong>
 
-                  <p>
-                    ${formatDate(news.publishedAt)}
-                  </p>
+              <p>
+                ${formatDate(news.publishedAt)}
+              </p>
 
-                </div>
+            </div>
 
-                <a
-                  class="read-button"
-                  href="${news.sourceUrl || "#"}"
-                  target="_blank"
-                >
-                  Read News
-                </a>
+            <a
+              class="read-button"
+              href="${readerLink}"
+            >
+              Read News
+            </a>
 
-              </article>
-
-            `
-          )
-          .join("")
-
-      : "<p>No previous automatic news yet.</p>";
+          </article>
+        `;
+      })
+      .join("");
 }
-
 
 function loadHomeNews() {
 
-  // Today's date
   homeSectionDate.textContent =
     new Date().toLocaleDateString(
       "en-IN",
@@ -172,8 +175,6 @@ function loadHomeNews() {
       }
     );
 
-
-  // Category buttons
   document
     .querySelectorAll(".category-grid button")
     .forEach(button => {
@@ -188,19 +189,15 @@ function loadHomeNews() {
 
         window.location.href =
           `archive.html?category=${encodeURIComponent(category)}`;
-
       });
 
     });
 
-
-  // Firestore realtime listener
   const newsQuery = query(
     collection(db, "automaticNews"),
     orderBy("publishedAt", "desc"),
     limit(4)
   );
-
 
   onSnapshot(
     newsQuery,
@@ -208,7 +205,7 @@ function loadHomeNews() {
     snapshot => {
 
       console.log(
-        "News updated automatically!"
+        "Automatic news updated!"
       );
 
       const newsItems =
@@ -218,7 +215,6 @@ function loadHomeNews() {
         }));
 
       displayNews(newsItems);
-
     },
 
     error => {
@@ -236,6 +232,5 @@ function loadHomeNews() {
     }
   );
 }
-
 
 loadHomeNews();

@@ -7,15 +7,49 @@ import {
 
 import { db } from "./firebase-config.js";
 
-const archiveGrid = document.getElementById("archiveGrid");
-const archiveCategory = document.getElementById("archiveCategory");
+
+const archiveGrid =
+  document.getElementById("archiveGrid");
+
+const archiveCategory =
+  document.getElementById("archiveCategory");
 
 let allNews = [];
+const archiveHeading =
+  document.querySelector(".archive-heading h1");
+
+const archiveDescription =
+  document.querySelector(".archive-heading > p:last-child");
+
+
+/* =========================================
+   NORMALIZE CATEGORY
+========================================= */
+
+function normalizeCategory(category) {
+
+  return String(category || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]+/g, "-");
+}
+
+
+/* =========================================
+   FORMAT DATE
+========================================= */
 
 function formatDate(dateString) {
-  if (!dateString) return "Date unavailable";
 
-  return new Date(dateString).toLocaleDateString(
+  if (!dateString) return "";
+
+  const date = new Date(dateString);
+
+  if (isNaN(date)) {
+    return dateString;
+  }
+
+  return date.toLocaleDateString(
     "en-IN",
     {
       day: "numeric",
@@ -25,124 +59,458 @@ function formatDate(dateString) {
   );
 }
 
-function categoryName(category) {
-  if (!category) return "News";
 
-  return category
-    .split("-")
+/* =========================================
+   CATEGORY DISPLAY NAME
+========================================= */
+
+function categoryName(category) {
+
+  if (!category) {
+    return "News";
+  }
+
+  return String(category)
+    .split(/[\s_-]+/)
     .map(
-      (word) =>
-        word.charAt(0).toUpperCase() + word.slice(1)
+      word =>
+        word.charAt(0).toUpperCase() +
+        word.slice(1)
     )
     .join(" ");
 }
+function getCategoryIcon(category) {
+
+    const value =
+        String(category || "")
+            .toLowerCase();
+
+    if (value.includes("politics"))
+        return "🏛️";
+
+    if (value.includes("sports"))
+        return "🏏";
+
+    if (value.includes("technology"))
+        return "💻";
+
+    if (value.includes("business"))
+        return "💰";
+
+    if (value.includes("education"))
+        return "🎓";
+
+    if (value.includes("world"))
+        return "🌍";
+
+    if (value.includes("india"))
+        return "🇮🇳";
+
+    if (value.includes("tamil"))
+        return "📍";
+
+    return "📰";
+}
+
+/* =========================================
+   RENDER NEWS
+========================================= */
 
 function renderNews() {
 
-  const selectedCategory =
-    archiveCategory.value
-      .toLowerCase()
-      .replace(/\s+/g, "-");
+  if (!archiveCategory) {
+    return;
+  }
 
-  let newsToShow =
-    selectedCategory === "all"
-      ? allNews
-      : allNews.filter(
-          (news) =>
-            news.category === selectedCategory
+
+  const selectedCategory =
+    normalizeCategory(
+      archiveCategory.value
+    );
+
+
+  console.log(
+    "Selected category:",
+    selectedCategory
+  );
+
+
+  /* =====================================
+     CATEGORY FILTER
+  ===================================== */
+
+  let newsToShow;
+
+
+  if (
+    selectedCategory === "all" ||
+    selectedCategory === "all-categories"
+  ) {
+
+    newsToShow = [...allNews];
+
+  } else {
+
+    newsToShow =
+      allNews.filter(news => {
+
+        const newsCategory =
+          normalizeCategory(
+            news.category
+          );
+
+        console.log(
+          news.title,
+          "=>",
+          newsCategory
         );
 
+        return (
+          newsCategory ===
+          selectedCategory
+        );
+      });
+  }
+
+
+  /* =====================================
+     SEARCH FILTER
+  ===================================== */
+
   const searchText =
-    new URLSearchParams(window.location.search)
+    new URLSearchParams(
+      window.location.search
+    )
       .get("search")
       ?.trim()
       .toLowerCase() || "";
+      if (searchText) {
+  if (archiveHeading) {
+    archiveHeading.textContent =
+      `Search Results`;
+  }
+
+  if (archiveDescription) {
+    archiveDescription.textContent =
+      `Showing results for "${searchText}"`;
+  }
+} else {
+  if (archiveHeading) {
+    archiveHeading.textContent =
+      "Previous News";
+  }
+
+  if (archiveDescription) {
+    archiveDescription.textContent =
+      "Browse previously published daily news.";
+  }
+}
+
 
   if (searchText) {
 
-    newsToShow = newsToShow.filter((news) =>
-      `${news.title} ${news.category} ${
-        news.description || ""
-      }`
-        .toLowerCase()
-        .includes(searchText)
-    );
+    newsToShow =
+      newsToShow.filter(news => {
+
+        const searchableText =
+          `
+          ${news.title || ""}
+          ${news.category || ""}
+          ${news.description || ""}
+          ${news.source || ""}
+          `
+            .toLowerCase();
+
+        return searchableText
+          .includes(searchText);
+      });
   }
+
+
+  /* =====================================
+     NO RESULTS
+  ===================================== */
 
   if (newsToShow.length === 0) {
 
-    archiveGrid.innerHTML =
-      "<p>No automatic news found.</p>";
+    archiveGrid.innerHTML = `
+    <div class="archive-empty">
+
+        <h3>
+            ⚠️ Unable to Load News
+        </h3>
+
+        <p>
+            We couldn't connect to the news service.
+            Please refresh the page and try again.
+        </p>
+
+    </div>
+`;
 
     return;
   }
 
+
+  /* =====================================
+     DISPLAY NEWS
+  ===================================== */
+
   archiveGrid.innerHTML =
     newsToShow
-      .map(
-        (news) => `
+      .map(news => {
 
+        let readerLink;
+
+
+        if (news.type === "automatic") {
+
+          readerLink =
+            `reader.html?type=automatic&id=${encodeURIComponent(news.id)}`;
+
+        } else {
+
+          readerLink =
+            `reader.html?id=${encodeURIComponent(news.id)}`;
+        }
+
+
+        const buttonText =
+          news.type === "automatic"
+            ? "Read News"
+            : "Read PDF";
+
+
+        return `
           <article class="publication-item">
 
             <div>
 
               <p class="news-category">
-                ${categoryName(news.category)}
-              </p>
+    ${getCategoryIcon(news.category)}
+    ${categoryName(news.category)}
+</p>
+
 
               <strong>
-                ${news.title}
-              </strong>
+    ${news.title || "Latest News"}
+</strong>
 
-              <p>
-                ${formatDate(news.publishedAt)}
-              </p>
+<div class="news-meta">
 
-              <p>
-                ${news.description || ""}
-              </p>
+    <span>
+        📅 ${formatDate(news.date)}
+    </span>
 
-              <small>
-                Source:
-                ${news.source || "Unknown"}
-              </small>
+    ${
+        news.source
+            ? `
+                <span>
+                    📰 ${news.source}
+                </span>
+              `
+            : ""
+    }
+
+</div>
+
+
+              ${
+                news.description
+                  ? `
+                    <p>
+                      ${news.description}
+                    </p>
+                  `
+                  : ""
+              }
 
             </div>
 
+
             <a
               class="read-button"
-              href="${news.sourceUrl || "#"}"
-              target="_blank"
+              href="${readerLink}"
             >
-              Read News
+              ${buttonText}
             </a>
 
           </article>
-
-        `
-      )
+        `;
+      })
       .join("");
 }
+
+
+/* =========================================
+   LOAD AUTOMATIC NEWS
+========================================= */
+
+async function loadAutomaticNews() {
+
+  const results =
+    await getDocs(
+      query(
+        collection(
+          db,
+          "automaticNews"
+        ),
+        orderBy(
+          "publishedAt",
+          "desc"
+        )
+      )
+    );
+
+
+  return results.docs.map(
+    newsDocument => {
+
+      const data =
+        newsDocument.data();
+
+
+      return {
+
+        id:
+          newsDocument.id,
+
+        type:
+          "automatic",
+
+        title:
+          data.title || "",
+
+        category:
+          data.category || "",
+
+        description:
+          data.description || "",
+
+        date:
+          data.publishedAt || "",
+
+        source:
+          data.source || "",
+
+        sourceUrl:
+          data.sourceUrl || ""
+      };
+    }
+  );
+}
+
+
+/* =========================================
+   LOAD PDF NEWS
+========================================= */
+
+async function loadPdfNews() {
+
+  const results =
+    await getDocs(
+      query(
+        collection(
+          db,
+          "news"
+        ),
+        orderBy(
+          "publicationDate",
+          "desc"
+        )
+      )
+    );
+
+
+  return results.docs.map(
+    newsDocument => {
+
+      const data =
+        newsDocument.data();
+
+
+      return {
+
+        id:
+          newsDocument.id,
+
+        type:
+          "pdf",
+
+        title:
+          data.title || "",
+
+        category:
+          data.category || "",
+
+        description:
+          data.description || "",
+
+        date:
+          data.publicationDate || "",
+
+        pdfUrl:
+          data.pdfUrl || ""
+      };
+    }
+  );
+}
+
+
+/* =========================================
+   LOAD BOTH NEWS COLLECTIONS
+========================================= */
 
 async function loadArchive() {
 
   try {
 
-    const results = await getDocs(
-      query(
-        collection(db, "automaticNews"),
-        orderBy("publishedAt", "desc")
-      )
+    const [
+      automaticNews,
+      pdfNews
+    ] =
+      await Promise.all([
+        loadAutomaticNews(),
+        loadPdfNews()
+      ]);
+
+
+    allNews = [
+      ...automaticNews,
+      ...pdfNews
+    ];
+
+
+    /* NEWEST FIRST */
+
+    allNews.sort(
+      (a, b) =>
+        new Date(b.date) -
+        new Date(a.date)
     );
 
-    allNews = results.docs.map(
-      (newsDocument) => ({
-        id: newsDocument.id,
-        ...newsDocument.data()
-      })
+
+    console.log(
+      "Total news:",
+      allNews.length
     );
+
+
+    console.log(
+      "Categories found:",
+      [
+        ...new Set(
+          allNews.map(
+            news =>
+              news.category
+          )
+        )
+      ]
+    );
+
 
     renderNews();
+
 
   } catch (error) {
 
@@ -151,36 +519,81 @@ async function loadArchive() {
       error
     );
 
-    archiveGrid.innerHTML =
-      "<p>Unable to load automatic news. Please try again later.</p>";
+
+    archiveGrid.innerHTML = `
+      <div class="archive-empty">
+
+        <h3>
+          Unable to load news
+        </h3>
+
+        <p>
+          Please try again later.
+        </p>
+
+      </div>
+    `;
   }
 }
 
-archiveCategory.addEventListener(
-  "change",
-  renderNews
-);
+
+/* =========================================
+   CATEGORY CHANGE
+========================================= */
+
+if (archiveCategory) {
+
+  archiveCategory.addEventListener(
+    "change",
+    renderNews
+  );
+}
+
+
+/* =========================================
+   CATEGORY FROM URL
+========================================= */
 
 const requestedCategory =
   new URLSearchParams(
     window.location.search
   ).get("category");
 
+
 if (requestedCategory) {
 
-  const matchingOption =
-    [...archiveCategory.options].find(
-      (option) =>
-        option.value
-          .toLowerCase()
-          .replace(/\s+/g, "-") ===
-        requestedCategory
+  const requested =
+    normalizeCategory(
+      requestedCategory
     );
 
+
+  const matchingOption =
+    [
+      ...archiveCategory.options
+    ].find(option => {
+
+      return (
+        normalizeCategory(
+          option.value
+        ) === requested ||
+        normalizeCategory(
+          option.textContent
+        ) === requested
+      );
+    });
+
+
   if (matchingOption) {
+
     archiveCategory.value =
       matchingOption.value;
   }
 }
+
+
+/* =========================================
+   START
+========================================= */
 
 loadArchive();

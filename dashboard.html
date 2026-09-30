@@ -2,15 +2,455 @@
 <html lang="en">
 
 <head>
-
     <meta charset="UTF-8">
-
-    <meta name="viewport"
-          content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <title>Admin Dashboard | New TN Politics</title>
 
     <link rel="stylesheet" href="style.css">
+
+    <style>
+        /* =========================
+           DASHBOARD MODERN DESIGN
+           ========================= */
+
+        .dashboard-page {
+            background: #f4f6f8;
+            min-height: 100vh;
+            padding: 70px 20px;
+        }
+
+        .dashboard-container {
+            max-width: 1250px;
+            margin: auto;
+        }
+
+        /* HEADER */
+
+        .dashboard-page + .footer {
+            margin-top: 0;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.96);
+            border-bottom: 1px solid #e5e7eb;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header .navbar {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .header .navbar a {
+            text-decoration: none;
+            color: #151515;
+            font-weight: 700;
+            padding: 12px 18px;
+            border-radius: 12px;
+            transition: 0.25s ease;
+        }
+
+        .header .navbar a:hover {
+            background: #f1f1f1;
+            color: #e31b23;
+            transform: translateY(-2px);
+        }
+
+        #logoutButton {
+            color: #e31b23;
+            border: 1px solid #f0c7ca;
+            background: #fff7f7;
+        }
+
+        #logoutButton:hover {
+            background: #e31b23;
+            color: white;
+        }
+
+        /* DASHBOARD HEADING */
+
+        .dashboard-heading {
+            margin-bottom: 40px;
+        }
+
+        .dashboard-heading .section-label {
+            color: #e31b23;
+            font-size: 13px;
+            font-weight: 800;
+            letter-spacing: 3px;
+            margin-bottom: 10px;
+        }
+
+        .dashboard-heading h1 {
+            font-size: clamp(45px, 6vw, 72px);
+            line-height: 1;
+            margin: 0 0 18px;
+            color: #111;
+        }
+
+        .dashboard-heading > p:last-child {
+            font-size: 18px;
+            color: #697386;
+            margin: 0;
+        }
+
+        /* STATISTICS */
+
+        .dashboard-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 22px;
+            margin-bottom: 35px;
+        }
+
+        .stat-card {
+            position: relative;
+            overflow: hidden;
+            background: white;
+            border: 1px solid #e2e5e9;
+            border-radius: 22px;
+            padding: 30px;
+            min-height: 145px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.05);
+            transition: 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 16px 35px rgba(0, 0, 0, 0.10);
+            border-color: #e31b23;
+        }
+
+        .stat-card::after {
+            content: "";
+            position: absolute;
+            width: 90px;
+            height: 90px;
+            border-radius: 50%;
+            background: #e31b23;
+            opacity: 0.07;
+            right: -25px;
+            bottom: -30px;
+        }
+
+        .stat-number {
+            display: block;
+            font-family: Georgia, serif;
+            font-size: 42px;
+            font-weight: 700;
+            color: #111;
+            margin-bottom: 12px;
+        }
+
+        .stat-title {
+            display: block;
+            color: #687180;
+            font-size: 15px;
+            font-weight: 700;
+        }
+
+        /* PUBLISH SECTION */
+
+        .upload-section {
+            background: white;
+            border: 1px solid #e1e4e8;
+            border-radius: 24px;
+            padding: 42px;
+            margin-bottom: 35px;
+            box-shadow: 0 10px 35px rgba(0, 0, 0, 0.06);
+        }
+
+        .upload-heading {
+            border-bottom: 1px solid #ececec;
+            padding-bottom: 25px;
+            margin-bottom: 30px;
+        }
+
+        .upload-heading .section-label {
+            color: #e31b23;
+            font-size: 13px;
+            font-weight: 800;
+            letter-spacing: 3px;
+            margin-bottom: 8px;
+        }
+
+        .upload-heading h2 {
+            font-family: Georgia, serif;
+            font-size: 38px;
+            margin: 0;
+            color: #111;
+        }
+
+        /* FORM */
+
+        #publishForm {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 24px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group:first-child,
+        .form-group:last-of-type {
+            grid-column: 1 / -1;
+        }
+
+        .form-group label {
+            font-weight: 800;
+            color: #222;
+            margin-bottom: 9px;
+            font-size: 14px;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            border: 1px solid #d7dbe0;
+            background: #fafbfc;
+            border-radius: 12px;
+            padding: 15px 16px;
+            font-size: 15px;
+            font-family: inherit;
+            color: #222;
+            outline: none;
+            transition: 0.25s ease;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            border-color: #e31b23;
+            background: white;
+            box-shadow: 0 0 0 4px rgba(227, 27, 35, 0.08);
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 120px;
+        }
+
+        .form-group p {
+            color: #7a818c;
+            font-size: 13px;
+            margin: 8px 0 0;
+        }
+
+        /* PUBLISH BUTTON */
+
+        .publish-button {
+            grid-column: 1 / -1;
+            border: none;
+            background: #e31b23;
+            color: white;
+            padding: 16px 25px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 800;
+            cursor: pointer;
+            transition: 0.25s ease;
+            box-shadow: 0 8px 18px rgba(227, 27, 35, 0.20);
+        }
+
+        .publish-button:hover {
+            background: #c9141b;
+            transform: translateY(-2px);
+            box-shadow: 0 12px 25px rgba(227, 27, 35, 0.28);
+        }
+
+        .publish-button:active {
+            transform: translateY(0);
+        }
+
+        .publish-message {
+            grid-column: 1 / -1;
+            margin: 0;
+            font-weight: 700;
+        }
+
+        /* RECENT PUBLICATIONS */
+
+        .recent-section {
+            background: white;
+            border: 1px solid #e1e4e8;
+            border-radius: 24px;
+            padding: 38px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+        }
+
+        .recent-section .section-heading {
+            margin-bottom: 25px;
+        }
+
+        .recent-section .section-label {
+            color: #e31b23;
+            font-size: 13px;
+            font-weight: 800;
+            letter-spacing: 3px;
+        }
+
+        .recent-section h2 {
+            font-family: Georgia, serif;
+            font-size: 34px;
+            margin-top: 8px;
+        }
+
+        .publication-list {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .publication-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 20px;
+            padding: 22px;
+            border: 1px solid #e5e7eb;
+            border-radius: 16px;
+            background: #fafafa;
+            transition: 0.25s ease;
+        }
+
+        .publication-item:hover {
+            background: white;
+            border-color: #e31b23;
+            transform: translateX(4px);
+            box-shadow: 0 8px 22px rgba(0, 0, 0, 0.06);
+        }
+
+        .publication-item strong {
+            font-size: 17px;
+            color: #171717;
+        }
+
+        .publication-item p {
+            color: #7a818c;
+            margin: 6px 0 0;
+            font-size: 14px;
+        }
+
+        .published-badge {
+            background: #e9f8ef;
+            color: #168344;
+            border: 1px solid #bce8cc;
+            padding: 8px 13px;
+            border-radius: 30px;
+            font-size: 12px;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+
+        /* FOOTER */
+
+        .footer {
+            background: #111;
+            color: white;
+            padding: 35px 20px;
+            text-align: center;
+        }
+
+        .footer .logo {
+            margin-bottom: 8px;
+        }
+
+        .footer p {
+            color: #aaa;
+        }
+
+        /* MOBILE */
+
+        @media (max-width: 800px) {
+
+            .dashboard-page {
+                padding: 45px 15px;
+            }
+
+            .header {
+                position: relative;
+            }
+
+            .header .navbar {
+                gap: 4px;
+            }
+
+            .header .navbar a {
+                padding: 9px 10px;
+                font-size: 13px;
+            }
+
+            .dashboard-stats {
+                grid-template-columns: 1fr;
+            }
+
+            .upload-section,
+            .recent-section {
+                padding: 25px 20px;
+                border-radius: 18px;
+            }
+
+            #publishForm {
+                grid-template-columns: 1fr;
+            }
+
+            .form-group:first-child,
+            .form-group:last-of-type {
+                grid-column: auto;
+            }
+
+            .publish-button,
+            .publish-message {
+                grid-column: auto;
+            }
+
+            .upload-heading h2 {
+                font-size: 30px;
+            }
+
+            .publication-item {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .dashboard-heading h1 {
+                font-size: 48px;
+            }
+        }
+
+        @media (max-width: 500px) {
+
+            .header {
+                padding: 10px;
+            }
+
+            .header .logo {
+                font-size: 16px;
+            }
+
+            .header .navbar a {
+                font-size: 11px;
+                padding: 7px;
+            }
+
+            .dashboard-heading h1 {
+                font-size: 42px;
+            }
+
+            .stat-card {
+                padding: 24px;
+            }
+        }
+    </style>
 
 </head>
 
@@ -35,8 +475,9 @@
             <a href="reader.html">
                 Today's News
             </a>
+
             <a href="#" id="logoutButton">
-                   Logout
+                Logout
             </a>
 
         </nav>
@@ -114,7 +555,7 @@
             </div>
 
 
-            <!-- UPLOAD SECTION -->
+            <!-- PUBLISH SECTION -->
 
             <section class="upload-section">
 
@@ -133,26 +574,24 @@
 
                 <form id="publishForm">
 
-
-                    <!-- PDF -->
-
                     <!-- GOOGLE DRIVE PDF LINK -->
 
                     <div class="form-group">
 
-                     <label for="newsPdfUrl">
-                       Google Drive PDF Link
-                     </label>
+                        <label for="newsPdfUrl">
+                            Google Drive PDF Link
+                        </label>
 
-                     <input
-                       type="url"
-                       id="newsPdfUrl"
-                       placeholder="Paste the Google Drive sharing link"
-                       required>
+                        <input
+                            type="url"
+                            id="newsPdfUrl"
+                            placeholder="Paste the Google Drive sharing link"
+                            required>
 
-                     <p>
-                       Upload the PDF to Google Drive and set access to “Anyone with the link”.
-                     </p>
+                        <p>
+                            Upload the PDF to Google Drive and set access to
+                            “Anyone with the link”.
+                        </p>
 
                     </div>
 
@@ -198,8 +637,7 @@
                             Category
                         </label>
 
-                        <select id="newsCategory"
-                                required>
+                        <select id="newsCategory" required>
 
                             <option value="">
                                 Select category
@@ -269,10 +707,10 @@
                     </button>
 
 
-                    <p id="publishMessage"
-                       class="publish-message">
+                    <p
+                        id="publishMessage"
+                        class="publish-message">
                     </p>
-
 
                 </form>
 
@@ -302,7 +740,6 @@
 
                 <div class="publication-list">
 
-
                     <div class="publication-item">
 
                         <div>
@@ -323,7 +760,6 @@
                         </span>
 
                     </div>
-
 
                 </div>
 
@@ -352,10 +788,24 @@
     </footer>
 
 
+    <!-- EXISTING JAVASCRIPT — DO NOT CHANGE -->
+
     <script src="script.js"></script>
-    <script type="module" src="dashboard-auth.js"></script>
-    <script type="module" src="dashboard-publish.js"></script>
-    <script type="module" src="dashboard-stats.js"></script>
+
+    <script
+        type="module"
+        src="dashboard-auth.js">
+    </script>
+
+    <script
+        type="module"
+        src="dashboard-publish.js">
+    </script>
+
+    <script
+        type="module"
+        src="dashboard-stats.js">
+    </script>
 
 </body>
 
