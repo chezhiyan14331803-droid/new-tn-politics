@@ -213,14 +213,24 @@ async function loadAutomaticNews(
     newsDocument.data();
 
 
-  /* TITLE */
+  console.log(
+    "Automatic news loaded:",
+    news
+  );
+
+
+  /* =====================================
+     TITLE
+  ===================================== */
 
   readerTitle.textContent =
     news.title ||
     "Latest News";
 
 
-  /* DATE */
+  /* =====================================
+     DATE
+  ===================================== */
 
   readerDate.textContent =
     news.publishedAt
@@ -230,7 +240,9 @@ async function loadAutomaticNews(
       : "Date unavailable";
 
 
-  /* SOURCE */
+  /* =====================================
+     SOURCE
+  ===================================== */
 
   if (readerSource) {
 
@@ -242,7 +254,9 @@ async function loadAutomaticNews(
   }
 
 
-  /* CATEGORY */
+  /* =====================================
+     CATEGORY
+  ===================================== */
 
   if (readerCategory) {
 
@@ -254,7 +268,9 @@ async function loadAutomaticNews(
   }
 
 
-  /* IMAGE */
+  /* =====================================
+     IMAGE
+  ===================================== */
 
   if (
     news.imageUrl &&
@@ -275,18 +291,28 @@ async function loadAutomaticNews(
   }
 
 
-  /* DESCRIPTION */
+  /* =====================================
+     DESCRIPTION
+  ===================================== */
 
   if (readerDescription) {
 
-    readerDescription.textContent =
+    const description =
       news.description ||
-      "Read the latest news from Daily News Updates.";
+      news.content ||
+      news.summary ||
+      "";
+
+    readerDescription.textContent =
+      description.trim() ||
+      "No description available for this news.";
 
   }
 
 
-  /* HIDE PDF */
+  /* =====================================
+     HIDE PDF
+  ===================================== */
 
   if (pdfContainer) {
 
@@ -294,7 +320,6 @@ async function loadAutomaticNews(
       "none";
 
   }
-
 
   if (readerPdf) {
 
@@ -306,7 +331,9 @@ async function loadAutomaticNews(
   }
 
 
-  /* ORIGINAL NEWS BUTTON */
+  /* =====================================
+     ORIGINAL NEWS BUTTON
+  ===================================== */
 
   if (
     news.sourceUrl &&
@@ -331,12 +358,17 @@ async function loadAutomaticNews(
   }
 
 
+  /* =====================================
+     STATUS
+  ===================================== */
+
   if (readerStatus) {
 
     readerStatus.textContent =
       "You are reading an automatic news update.";
 
   }
+
 }
 
 
@@ -416,14 +448,18 @@ async function loadPdfNews(
   }
 
 
-  /* TITLE */
+  /* =====================================
+     TITLE
+  ===================================== */
 
   readerTitle.textContent =
     news.title ||
     "Latest News";
 
 
-  /* DATE */
+  /* =====================================
+     DATE
+  ===================================== */
 
   readerDate.textContent =
     formatDate(
@@ -431,7 +467,9 @@ async function loadPdfNews(
     );
 
 
-  /* SOURCE */
+  /* =====================================
+     SOURCE
+  ===================================== */
 
   if (readerSource) {
 
@@ -441,7 +479,9 @@ async function loadPdfNews(
   }
 
 
-  /* CATEGORY */
+  /* =====================================
+     CATEGORY
+  ===================================== */
 
   if (readerCategory) {
 
@@ -451,7 +491,9 @@ async function loadPdfNews(
   }
 
 
-  /* DESCRIPTION */
+  /* =====================================
+     DESCRIPTION
+  ===================================== */
 
   if (readerDescription) {
 
@@ -461,7 +503,9 @@ async function loadPdfNews(
   }
 
 
-  /* HIDE IMAGE */
+  /* =====================================
+     HIDE IMAGE
+  ===================================== */
 
   if (readerImageContainer) {
 
@@ -471,7 +515,9 @@ async function loadPdfNews(
   }
 
 
-  /* PDF */
+  /* =====================================
+     PDF
+  ===================================== */
 
   if (
     news.pdfUrl &&
@@ -493,7 +539,9 @@ async function loadPdfNews(
   }
 
 
-  /* DOWNLOAD */
+  /* =====================================
+     DOWNLOAD
+  ===================================== */
 
   if (
     news.pdfUrl &&
@@ -518,12 +566,17 @@ async function loadPdfNews(
   }
 
 
+  /* =====================================
+     STATUS
+  ===================================== */
+
   if (readerStatus) {
 
     readerStatus.textContent =
       "Published PDF news";
 
   }
+
 }
 
 
@@ -645,6 +698,7 @@ async function loadNews() {
     }
 
   }
+
 }
 
 
