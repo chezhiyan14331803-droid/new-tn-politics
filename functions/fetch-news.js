@@ -1,5 +1,11 @@
 const admin = require("firebase-admin");
-console.log("🔥 CATEGORY VERSION 2 IS RUNNING 🔥");
+
+console.log("🔥 CATEGORY VERSION 3 IS RUNNING 🔥");
+
+// =====================================================
+// FIREBASE INITIALIZATION
+// =====================================================
+
 if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
   throw new Error("FIREBASE_SERVICE_ACCOUNT secret is missing.");
 }
@@ -15,9 +21,89 @@ admin.initializeApp({
 const db = admin.firestore();
 
 
-/* =========================================
-   FIND NEWS CATEGORY
-========================================= */
+// =====================================================
+// DELETE AUTOMATIC NEWS OLDER THAN 20 DAYS
+// =====================================================
+
+async function deleteOldNews() {
+  console.log("🧹 Checking for automatic news older than 20 days...");
+
+  const cutoffDate = new Date();
+  cutoffDate.setDate(cutoffDate.getDate() - 20);
+
+  const snapshot = await db
+    .collection("automaticNews")
+    .get();
+
+  if (snapshot.empty) {
+    console.log("✅ No automatic news found.");
+    return;
+  }
+
+  const docsToDelete = [];
+
+  for (const doc of snapshot.docs) {
+    const data = doc.data();
+
+    let savedDate = null;
+
+    // New documents use savedAt
+    if (data.savedAt) {
+      if (typeof data.savedAt.toDate === "function") {
+        savedDate = data.savedAt.toDate();
+      } else if (data.savedAt instanceof Date) {
+        savedDate = data.savedAt;
+      }
+    }
+
+    // Fallback for old documents
+    // that were created before savedAt was added
+    if (!savedDate && data.publishedAt) {
+      const publishedDate = new Date(data.publishedAt);
+
+      if (!isNaN(publishedDate.getTime())) {
+        savedDate = publishedDate;
+      }
+    }
+
+    if (
+      savedDate &&
+      savedDate < cutoffDate
+    ) {
+      docsToDelete.push(doc);
+    }
+  }
+
+  if (docsToDelete.length === 0) {
+    console.log("✅ No automatic news older than 20 days found.");
+    return;
+  }
+
+  // Firestore batch limit is 500 operations.
+  for (let i = 0; i < docsToDelete.length; i += 500) {
+    const batch = db.batch();
+
+    const chunk = docsToDelete.slice(
+      i,
+      i + 500
+    );
+
+    chunk.forEach(doc => {
+      batch.delete(doc.ref);
+    });
+
+    await batch.commit();
+  }
+
+  console.log(
+    `🗑️ Deleted ${docsToDelete.length} automatic news article(s) older than 20 days.`
+  );
+}
+
+
+// =====================================================
+// FIND NEWS CATEGORY
+// =====================================================
 
 function getCategory(article) {
 
@@ -25,13 +111,17 @@ function getCategory(article) {
     ${article.title || ""}
     ${article.description || ""}
     ${article.content || ""}
-    ${Array.isArray(article.category)
-      ? article.category.join(" ")
-      : article.category || ""}
+    ${
+      Array.isArray(article.category)
+        ? article.category.join(" ")
+        : article.category || ""
+    }
   `.toLowerCase();
 
 
-  /* POLITICS */
+  // =====================================================
+  // POLITICS
+  // =====================================================
 
   if (
     text.includes("politic") ||
@@ -53,7 +143,9 @@ function getCategory(article) {
   }
 
 
-  /* SPORTS */
+  // =====================================================
+  // SPORTS
+  // =====================================================
 
   if (
     text.includes("cricket") ||
@@ -70,7 +162,9 @@ function getCategory(article) {
   }
 
 
-  /* TECHNOLOGY */
+  // =====================================================
+  // TECHNOLOGY
+  // =====================================================
 
   if (
     text.includes("technology") ||
@@ -88,7 +182,9 @@ function getCategory(article) {
   }
 
 
-  /* BUSINESS */
+  // =====================================================
+  // BUSINESS
+  // =====================================================
 
   if (
     text.includes("business") ||
@@ -106,7 +202,9 @@ function getCategory(article) {
   }
 
 
-  /* EDUCATION */
+  // =====================================================
+  // EDUCATION
+  // =====================================================
 
   if (
     text.includes("education") ||
@@ -123,7 +221,9 @@ function getCategory(article) {
   }
 
 
-  /* TAMIL NADU */
+  // =====================================================
+  // TAMIL NADU
+  // =====================================================
 
   if (
     text.includes("tamil nadu") ||
@@ -143,7 +243,9 @@ function getCategory(article) {
   }
 
 
-  /* INDIA */
+  // =====================================================
+  // INDIA
+  // =====================================================
 
   if (
     text.includes("india") ||
@@ -160,7 +262,9 @@ function getCategory(article) {
   }
 
 
-  /* WORLD */
+  // =====================================================
+  // WORLD
+  // =====================================================
 
   if (
     text.includes("usa") ||
@@ -181,38 +285,176 @@ function getCategory(article) {
   }
 
 
-  /* DEFAULT */
+  // =====================================================
+  // DEFAULT
+  // =====================================================
 
   return "Tamil Nadu";
 }
 
 
-/* =========================================
-   FETCH NEWS
-========================================= */
+// =====================================================
+// TODAY'S DATE + FETCH WINDOW
+// =====================================================
+
+const now = new Date();
+
+const indiaTime = new Intl.DateTimeFormat("en-IN", {
+  timeZone: "Asia/Kolkata",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false
+}).formatToParts(now);
+
+const getPart = (name) =>
+  indiaTime.find(
+    part => part.type === name
+  )?.value;
+
+const year = Number(getPart("year"));
+const month = Number(getPart("month"));
+const day = Number(getPart("day"));
+const hour = Number(getPart("hour"));
+const minute = Number(getPart("minute"));
+
+const today =
+  `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+
+
+let fetchBatch = "";
+
+let startHour = 0;
+let startMinute = 0;
+
+let endHour = 0;
+let endMinute = 0;
+
+
+// =====================================================
+// F1
+// News published between 6:00 AM and 10:00 AM
+// Workflow runs at 10:30 AM
+// =====================================================
+
+if (
+  hour >= 10 &&
+  hour < 12
+) {
+
+  fetchBatch = "F1";
+
+  startHour = 6;
+  startMinute = 0;
+
+  endHour = 10;
+  endMinute = 0;
+}
+
+
+// =====================================================
+// F2
+// News published between 11:00 AM and 5:30 PM
+// Workflow runs at 6:30 PM
+// =====================================================
+
+else if (
+  hour >= 18 &&
+  hour < 20
+) {
+
+  fetchBatch = "F2";
+
+  startHour = 11;
+  startMinute = 0;
+
+  endHour = 17;
+  endMinute = 30;
+}
+
+
+// =====================================================
+// F3
+// News published between 6:00 PM and 10:00 PM
+// Workflow runs at 10:30 PM
+// =====================================================
+
+else if (
+  hour >= 22
+) {
+
+  fetchBatch = "F3";
+
+  startHour = 18;
+  startMinute = 0;
+
+  endHour = 22;
+  endMinute = 0;
+}
+
+
+console.log("=================================");
+console.log("TODAY:", today);
+console.log("BATCH:", fetchBatch);
+console.log("CURRENT IST HOUR:", hour);
+console.log("CURRENT IST MINUTE:", minute);
+console.log("=================================");
+
+
+// =====================================================
+// FETCH NEWS
+// =====================================================
 
 async function fetchNews() {
+
+  // ===================================================
+  // SAFETY CHECK
+  // ===================================================
+
+  if (!fetchBatch) {
+
+    console.log(
+      "⏭️ Current time is outside the scheduled fetch windows."
+    );
+
+    console.log(
+      "No news will be saved."
+    );
+
+    // Still perform cleanup
+    await deleteOldNews();
+
+    return;
+  }
+
+
+  // ===================================================
+  // NEWS DATA API KEY
+  // ===================================================
 
   const apiKey =
     process.env.NEWSDATA_API_KEY;
 
   if (!apiKey) {
+
     throw new Error(
       "NEWSDATA_API_KEY secret is missing."
     );
   }
 
 
+  // ===================================================
+  // NEWS DATA API
+  // ===================================================
+
   const url =
-    `https://newsdata.io/api/1/latest` +
-    `?apikey=${encodeURIComponent(apiKey)}` +
-    `&q=Tamil%20Nadu` +
-    `&country=in` +
-    `&language=en`;
+    `https://newsdata.io/api/1/latest?q=Tamil%20Nadu&country=in&language=en&timezone=Asia/Kolkata&size=10&apikey=${apiKey}`;
 
 
   console.log(
-    "Fetching latest news..."
+    `📰 Fetching news for ${fetchBatch}...`
   );
 
 
@@ -231,14 +473,146 @@ async function fetchNews() {
   const data =
     await response.json();
 
+  const articles =
+    data.results || [];
+
+
+  // =====================================================
+  // KEEP ONLY TODAY'S ARTICLES IN CURRENT BATCH
+  // =====================================================
+
+  const filteredArticles =
+    articles.filter(article => {
+
+      if (!article.pubDate) {
+        return false;
+      }
+
+
+      const published =
+        new Date(article.pubDate);
+
+
+      if (
+        isNaN(
+          published.getTime()
+        )
+      ) {
+        return false;
+      }
+
+
+      const indiaPublished =
+        new Intl.DateTimeFormat("en-IN", {
+          timeZone: "Asia/Kolkata",
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false
+        }).formatToParts(published);
+
+
+      const getPublishedPart =
+        (name) =>
+          indiaPublished.find(
+            part => part.type === name
+          )?.value;
+
+
+      const publishedYear =
+        Number(
+          getPublishedPart("year")
+        );
+
+      const publishedMonth =
+        Number(
+          getPublishedPart("month")
+        );
+
+      const publishedDay =
+        Number(
+          getPublishedPart("day")
+        );
+
+      const publishedHour =
+        Number(
+          getPublishedPart("hour")
+        );
+
+      const publishedMinute =
+        Number(
+          getPublishedPart("minute")
+        );
+
+
+      const publishedDate =
+        `${publishedYear}-${String(publishedMonth).padStart(2, "0")}-${String(publishedDay).padStart(2, "0")}`;
+
+
+      // ===============================================
+      // NEVER ACCEPT PREVIOUS-DAY NEWS
+      // ===============================================
+
+      if (
+        publishedDate !== today
+      ) {
+        return false;
+      }
+
+
+      const publishedMinutes =
+        publishedHour * 60 +
+        publishedMinute;
+
+
+      const startMinutes =
+        startHour * 60 +
+        startMinute;
+
+
+      const endMinutes =
+        endHour * 60 +
+        endMinute;
+
+
+      return (
+        publishedMinutes >=
+          startMinutes &&
+        publishedMinutes <=
+          endMinutes
+      );
+    });
+
+
+  console.log(
+    `Articles received: ${articles.length}`
+  );
+
+
+  console.log(
+    `Articles matching ${fetchBatch}: ${filteredArticles.length}`
+  );
+
+
+  // =====================================================
+  // DELETE OLD NEWS
+  // =====================================================
+
+  await deleteOldNews();
+
+
+  // =====================================================
+  // NO MATCHING NEWS
+  // =====================================================
 
   if (
-    !data.results ||
-    data.results.length === 0
+    filteredArticles.length === 0
   ) {
 
     console.log(
-      "No news articles found."
+      `ℹ️ No articles found for ${fetchBatch}.`
     );
 
     return;
@@ -246,24 +620,32 @@ async function fetchNews() {
 
 
   console.log(
-    `Found ${data.results.length} articles.`
+    `✅ Saving ${filteredArticles.length} article(s) from ${fetchBatch}.`
   );
 
+
+  // =====================================================
+  // FIRESTORE BATCH
+  // =====================================================
 
   const batch =
     db.batch();
 
 
+  // =====================================================
+  // SAVE ONLY FILTERED ARTICLES
+  // =====================================================
+
   for (
-    const article of
-    data.results.slice(0, 10)
+    const article of filteredArticles.slice(0, 10)
   ) {
 
     const articleId =
       article.article_id ||
       Buffer.from(
         article.link ||
-        article.title
+        article.title ||
+        Date.now().toString()
       )
         .toString("base64")
         .replace(
@@ -290,6 +672,38 @@ async function fetchNews() {
     );
 
 
+    // =================================================
+    // CHECK WHETHER THIS IS A NEW ARTICLE
+    // =================================================
+
+    const existingDoc =
+      await newsRef.get();
+
+
+    let savedAt;
+
+    if (
+      existingDoc.exists &&
+      existingDoc.data().savedAt
+    ) {
+
+      // Preserve original saved time
+      savedAt =
+        existingDoc.data().savedAt;
+
+    } else {
+
+      // New article
+      savedAt =
+        admin.firestore.FieldValue
+          .serverTimestamp();
+    }
+
+
+    // =================================================
+    // SAVE ARTICLE
+    // =================================================
+
     batch.set(
       newsRef,
       {
@@ -314,6 +728,9 @@ async function fetchNews() {
           article.pubDate ||
           "",
 
+        savedAt:
+          savedAt,
+
         category:
           category,
 
@@ -333,19 +750,30 @@ async function fetchNews() {
   }
 
 
+  // =====================================================
+  // COMMIT
+  // =====================================================
+
   await batch.commit();
 
 
   console.log(
-    "News successfully saved to automaticNews."
+    "✅ News successfully saved to automaticNews."
   );
 }
 
 
+// =====================================================
+// START
+// =====================================================
+
 fetchNews().catch(
   error => {
 
-    console.error(error);
+    console.error(
+      "❌ Fetch failed:",
+      error
+    );
 
     process.exit(1);
   }

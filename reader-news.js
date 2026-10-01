@@ -132,7 +132,7 @@ if (pdfContainer) {
 
   description.textContent =
     news.description ||
-    "Read the latest news from New TN Politics.";
+    "Read the latest news from Daily News Updates.";
 
 
   /*

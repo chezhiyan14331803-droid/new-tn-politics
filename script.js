@@ -23,7 +23,7 @@ function shareNews() {
 
   const shareData = {
     title: document.title,
-    text: "Read this news from New TN Politics.",
+    text: "Read this news from Daily News Updates.",
     url: window.location.href
   };
 
