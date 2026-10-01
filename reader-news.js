@@ -10,11 +10,25 @@ import {
 
 import { db } from "./firebase-config.js";
 
+
+/* =========================================
+   ELEMENTS
+========================================= */
+
 const readerTitle =
   document.getElementById("readerTitle");
 
 const readerDate =
   document.getElementById("readerDate");
+
+const readerSource =
+  document.getElementById("readerSource");
+
+const readerCategory =
+  document.getElementById("readerCategory");
+
+const readerDescription =
+  document.getElementById("readerDescription");
 
 const readerPdf =
   document.getElementById("readerPdf");
@@ -22,35 +36,149 @@ const readerPdf =
 const readerDownload =
   document.getElementById("readerDownload");
 
-const readerHeading =
-  document.querySelector(".reader-heading");
+const readerImage =
+  document.getElementById("readerImage");
+
+const readerImageContainer =
+  document.getElementById(
+    "readerImageContainer"
+  );
+
+const readerStatus =
+  document.getElementById("readerStatus");
+
+const pdfContainer =
+  document.querySelector(
+    ".pdf-container"
+  );
+
+
+/* =========================================
+   FORMAT DATE
+========================================= */
 
 function formatDate(dateString) {
 
-  if (!dateString) return "";
+  if (!dateString) {
+    return "";
+  }
 
-  const date = new Date(dateString);
+  const date =
+    new Date(dateString);
 
-  if (isNaN(date)) return dateString;
+  if (isNaN(date.getTime())) {
+    return dateString;
+  }
 
-  return date.toLocaleDateString("en-IN", {
-    day: "numeric",
-    month: "long",
-    year: "numeric"
-  });
+  return date.toLocaleDateString(
+    "en-IN",
+    {
+      day: "numeric",
+      month: "long",
+      year: "numeric"
+    }
+  );
 }
+
+
+/* =========================================
+   CATEGORY FORMAT
+========================================= */
+
+function formatCategory(category) {
+
+  if (!category) {
+    return "News";
+  }
+
+  return category
+    .split("-")
+    .map(word => {
+
+      return (
+        word.charAt(0).toUpperCase() +
+        word.slice(1)
+      );
+
+    })
+    .join(" ");
+}
+
+
+/* =========================================
+   GOOGLE DRIVE PDF PREVIEW
+========================================= */
 
 function getGoogleDrivePreviewUrl(url) {
 
-  if (!url) return "";
+  if (!url) {
+    return "";
+  }
 
   const match =
-    url.match(/\/d\/([a-zA-Z0-9_-]+)/) ||
-    url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+    url.match(
+      /\/d\/([a-zA-Z0-9_-]+)/
+    ) ||
+    url.match(
+      /[?&]id=([a-zA-Z0-9_-]+)/
+    );
 
-  if (!match) return url;
+  if (!match) {
+    return url;
+  }
 
-  return `https://drive.google.com/file/d/${match[1]}/preview`;
+  return (
+    `https://drive.google.com/file/d/` +
+    `${match[1]}/preview`
+  );
+}
+
+
+/* =========================================
+   RESET READER
+========================================= */
+
+function resetReader() {
+
+  if (readerImageContainer) {
+    readerImageContainer.style.display =
+      "none";
+  }
+
+  if (readerImage) {
+    readerImage.src = "";
+  }
+
+  if (pdfContainer) {
+    pdfContainer.style.display =
+      "none";
+  }
+
+  if (readerPdf) {
+    readerPdf.src = "";
+    readerPdf.style.display =
+      "none";
+  }
+
+  if (readerDownload) {
+    readerDownload.href = "#";
+    readerDownload.style.display =
+      "none";
+  }
+
+  if (readerSource) {
+    readerSource.textContent = "";
+  }
+
+  if (readerDescription) {
+    readerDescription.textContent =
+      "";
+  }
+
+  if (readerStatus) {
+    readerStatus.textContent =
+      "";
+  }
 }
 
 
@@ -58,118 +186,157 @@ function getGoogleDrivePreviewUrl(url) {
    AUTOMATIC NEWS
 ========================================= */
 
-async function loadAutomaticNews(newsId) {
+async function loadAutomaticNews(
+  newsId
+) {
 
   const newsDocument =
     await getDoc(
-      doc(db, "automaticNews", newsId)
+      doc(
+        db,
+        "automaticNews",
+        newsId
+      )
     );
+
 
   if (!newsDocument.exists()) {
-    throw new Error("Automatic news not found");
+
+    throw new Error(
+      "Automatic news not found"
+    );
+
   }
 
-  const news = newsDocument.data();
+
+  const news =
+    newsDocument.data();
+
+
+  /* TITLE */
 
   readerTitle.textContent =
-    news.title || "Latest News";
+    news.title ||
+    "Latest News";
+
+
+  /* DATE */
 
   readerDate.textContent =
-    formatDate(news.publishedAt);
-
-  /*
-     Hide PDF viewer because automatic
-     news is an online article.
-  */
-
-  readerPdf.style.display = "none";
-
-const pdfContainer =
-  document.querySelector(".pdf-container");
-
-if (pdfContainer) {
-  pdfContainer.style.setProperty(
-    "display",
-    "none",
-    "important"
-  );
-}
-
-  readerDownload.textContent =
-    "↗ Open Original News";
-
-  readerDownload.href =
-    news.sourceUrl || "#";
-
-  readerDownload.target = "_blank";
-
-  readerDownload.style.display =
-    news.sourceUrl ? "inline-flex" : "none";
+    news.publishedAt
+      ? formatDate(
+          news.publishedAt
+        )
+      : "Date unavailable";
 
 
-  /*
-     Add article description.
-  */
+  /* SOURCE */
 
-  let description =
-    document.getElementById("readerDescription");
+  if (readerSource) {
 
-  if (!description) {
+    readerSource.textContent =
+      news.source
+        ? `Source: ${news.source}`
+        : "";
 
-    description =
-      document.createElement("div");
-
-    description.id =
-      "readerDescription";
-
-    description.className =
-      "reader-description";
-
-    readerHeading.appendChild(
-      description
-    );
   }
 
-  description.textContent =
-    news.description ||
-    "Read the latest news from Daily News Updates.";
 
+  /* CATEGORY */
 
-  /*
-     Add category.
-  */
+  if (readerCategory) {
 
-  let category =
-    document.getElementById("readerCategory");
+    readerCategory.textContent =
+      formatCategory(
+        news.category
+      );
 
-  if (!category) {
-
-    category =
-      document.createElement("p");
-
-    category.id =
-      "readerCategory";
-
-    category.className =
-      "reader-category";
-
-    readerHeading.insertBefore(
-      category,
-      readerTitle
-    );
   }
 
-  category.textContent =
-    news.category
-      ? news.category
-          .split("-")
-          .map(
-            word =>
-              word.charAt(0).toUpperCase() +
-              word.slice(1)
-          )
-          .join(" ")
-      : "News";
+
+  /* IMAGE */
+
+  if (
+    news.imageUrl &&
+    readerImage &&
+    readerImageContainer
+  ) {
+
+    readerImage.src =
+      news.imageUrl;
+
+    readerImage.alt =
+      news.title ||
+      "News image";
+
+    readerImageContainer.style.display =
+      "block";
+
+  }
+
+
+  /* DESCRIPTION */
+
+  if (readerDescription) {
+
+    readerDescription.textContent =
+      news.description ||
+      "Read the latest news from Daily News Updates.";
+
+  }
+
+
+  /* HIDE PDF */
+
+  if (pdfContainer) {
+
+    pdfContainer.style.display =
+      "none";
+
+  }
+
+
+  if (readerPdf) {
+
+    readerPdf.style.display =
+      "none";
+
+    readerPdf.src = "";
+
+  }
+
+
+  /* ORIGINAL NEWS BUTTON */
+
+  if (
+    news.sourceUrl &&
+    readerDownload
+  ) {
+
+    readerDownload.href =
+      news.sourceUrl;
+
+    readerDownload.textContent =
+      "↗ Open Original News";
+
+    readerDownload.target =
+      "_blank";
+
+    readerDownload.rel =
+      "noopener noreferrer";
+
+    readerDownload.style.display =
+      "inline-flex";
+
+  }
+
+
+  if (readerStatus) {
+
+    readerStatus.textContent =
+      "You are reading an automatic news update.";
+
+  }
 }
 
 
@@ -177,25 +344,49 @@ if (pdfContainer) {
    PDF NEWS
 ========================================= */
 
-async function loadPdfNews(newsId) {
+async function loadPdfNews(
+  newsId
+) {
 
   let news;
+
+
+  /* =====================================
+     LOAD SPECIFIC PDF
+  ===================================== */
 
   if (newsId) {
 
     const newsDocument =
       await getDoc(
-        doc(db, "news", newsId)
+        doc(
+          db,
+          "news",
+          newsId
+        )
       );
 
+
     if (!newsDocument.exists()) {
-      throw new Error("News not found");
+
+      throw new Error(
+        "News not found"
+      );
+
     }
+
 
     news =
       newsDocument.data();
 
-  } else {
+  }
+
+
+  /* =====================================
+     LOAD LATEST PDF
+  ===================================== */
+
+  else {
 
     const latestNews =
       await getDocs(
@@ -209,19 +400,30 @@ async function loadPdfNews(newsId) {
         )
       );
 
+
     if (latestNews.empty) {
+
       throw new Error(
         "No news published yet"
       );
+
     }
+
 
     news =
       latestNews.docs[0].data();
+
   }
 
 
+  /* TITLE */
+
   readerTitle.textContent =
-    news.title;
+    news.title ||
+    "Latest News";
+
+
+  /* DATE */
 
   readerDate.textContent =
     formatDate(
@@ -229,36 +431,101 @@ async function loadPdfNews(newsId) {
     );
 
 
-  readerPdf.src =
-    getGoogleDrivePreviewUrl(
-      news.pdfUrl
-    );
+  /* SOURCE */
 
-  readerPdf.style.display =
-    "block";
+  if (readerSource) {
 
+    readerSource.textContent =
+      "Published News";
 
-  // Show PDF container for PDF news
-  const pdfContainer =
-    document.querySelector(".pdf-container");
-
-  if (pdfContainer) {
-    pdfContainer.style.display = "block";
   }
 
 
-  readerDownload.href =
-    news.pdfUrl;
+  /* CATEGORY */
 
-  readerDownload.textContent =
-    "↓ Download PDF";
+  if (readerCategory) {
 
-  readerDownload.target =
-    "_blank";
+    readerCategory.textContent =
+      "Daily News";
 
-  readerDownload.style.display =
-    "inline-flex";
+  }
+
+
+  /* DESCRIPTION */
+
+  if (readerDescription) {
+
+    readerDescription.textContent =
+      "Read the published news document below.";
+
+  }
+
+
+  /* HIDE IMAGE */
+
+  if (readerImageContainer) {
+
+    readerImageContainer.style.display =
+      "none";
+
+  }
+
+
+  /* PDF */
+
+  if (
+    news.pdfUrl &&
+    readerPdf &&
+    pdfContainer
+  ) {
+
+    readerPdf.src =
+      getGoogleDrivePreviewUrl(
+        news.pdfUrl
+      );
+
+    readerPdf.style.display =
+      "block";
+
+    pdfContainer.style.display =
+      "block";
+
+  }
+
+
+  /* DOWNLOAD */
+
+  if (
+    news.pdfUrl &&
+    readerDownload
+  ) {
+
+    readerDownload.href =
+      news.pdfUrl;
+
+    readerDownload.textContent =
+      "↓ Download PDF";
+
+    readerDownload.target =
+      "_blank";
+
+    readerDownload.rel =
+      "noopener noreferrer";
+
+    readerDownload.style.display =
+      "inline-flex";
+
+  }
+
+
+  if (readerStatus) {
+
+    readerStatus.textContent =
+      "Published PDF news";
+
+  }
 }
+
 
 /* =========================================
    MAIN
@@ -268,31 +535,51 @@ async function loadNews() {
 
   try {
 
+    resetReader();
+
+
     const params =
       new URLSearchParams(
         window.location.search
       );
 
+
     const newsId =
       params.get("id");
+
 
     const type =
       params.get("type");
 
 
-    if (type === "automatic" && newsId) {
+    /* =====================================
+       AUTOMATIC NEWS
+    ===================================== */
+
+    if (
+      type === "automatic" &&
+      newsId
+    ) {
 
       await loadAutomaticNews(
         newsId
       );
 
-    } else {
+    }
+
+
+    /* =====================================
+       PDF NEWS
+    ===================================== */
+
+    else {
 
       await loadPdfNews(
         newsId
       );
 
     }
+
 
   } catch (error) {
 
@@ -301,25 +588,68 @@ async function loadNews() {
       error
     );
 
+
     readerTitle.textContent =
       "News is not available";
+
 
     readerDate.textContent =
       "Please return later.";
 
-    readerPdf.style.display =
-      "none";
 
-const pdfContainer =
-  document.querySelector(".pdf-container");
+    if (readerCategory) {
 
-if (pdfContainer) {
-  pdfContainer.style.display = "none";
-}
+      readerCategory.textContent =
+        "Error";
 
-    readerDownload.style.display =
-      "none";
+    }
+
+
+    if (readerDescription) {
+
+      readerDescription.textContent =
+        "We could not load this news article. Please return to the homepage and try again.";
+
+    }
+
+
+    if (readerPdf) {
+
+      readerPdf.style.display =
+        "none";
+
+    }
+
+
+    if (pdfContainer) {
+
+      pdfContainer.style.display =
+        "none";
+
+    }
+
+
+    if (readerDownload) {
+
+      readerDownload.style.display =
+        "none";
+
+    }
+
+
+    if (readerStatus) {
+
+      readerStatus.textContent =
+        "Something went wrong while loading the news.";
+
+    }
+
   }
 }
+
+
+/* =========================================
+   START
+========================================= */
 
 loadNews();
