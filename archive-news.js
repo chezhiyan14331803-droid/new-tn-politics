@@ -156,7 +156,8 @@ function getSearchText() {
   )
     .get("search")
     ?.trim()
-    .toLowerCase() || "";
+    .toLowerCase()
+    .replace(/[\s_-]+/g, "") || "";
 }
 
 
@@ -312,10 +313,50 @@ function renderNews() {
 
 
   /* =====================================
-     SEARCH FILTER
-  ===================================== */
+   SEARCH FILTER
+===================================== */
 
-  if (searchText) {
+if (searchText) {
+
+  /*
+     If the search text is a category name,
+     search ONLY inside the category.
+  */
+
+  const categorySearches = [
+    "tamilnadu",
+    "india",
+    "world",
+    "politics",
+    "sports",
+    "technology",
+    "education",
+    "business"
+  ];
+
+
+  if (categorySearches.includes(searchText)) {
+
+    newsToShow =
+      newsToShow.filter(news => {
+
+        const newsCategory =
+          String(news.category || "")
+            .toLowerCase()
+            .replace(/[\s_-]+/g, "");
+
+        return newsCategory === searchText;
+
+      });
+
+  }
+
+  /*
+     Otherwise, perform normal text search
+     across title, category, description and source.
+  */
+
+  else {
 
     newsToShow =
       newsToShow.filter(news => {
@@ -330,60 +371,20 @@ function renderNews() {
 
           ${news.source || ""}
 
-        `.toLowerCase();
+        `
+          .toLowerCase()
+          .replace(/[\s_-]+/g, "");
 
 
-        return searchableText
-          .includes(searchText);
+        return searchableText.includes(
+          searchText
+        );
 
       });
 
   }
 
-
-  /* =====================================
-     NO RESULTS
-  ===================================== */
-
-  if (newsToShow.length === 0) {
-
-    archiveGrid.innerHTML = `
-
-      <div class="archive-empty">
-
-        <h3>
-          No News Found
-        </h3>
-
-        <p>
-          ${
-            searchText
-              ? `No news matched "${searchText}".`
-              : "There are no news articles in this category yet."
-          }
-        </p>
-
-        ${
-          searchText
-            ? `
-              <button
-                class="read-button"
-                onclick="window.location.href='archive.html'"
-              >
-                View All News
-              </button>
-            `
-            : ""
-        }
-
-      </div>
-
-    `;
-
-    return;
-  }
-
-
+}
   /* =====================================
      DISPLAY NEWS
   ===================================== */

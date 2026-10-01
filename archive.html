@@ -5,14 +5,17 @@
 
     <meta charset="UTF-8">
 
-    <meta name="viewport"
-          content="width=device-width, initial-scale=1.0">
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
 
     <title>Previous News | Daily News Updates</title>
+
     <meta
-    name="description"
-    content="Browse previous Daily News Updates by category."
->
+        name="description"
+        content="Browse previous Daily News Updates by category."
+    >
 
     <link rel="stylesheet" href="style.css">
 
@@ -22,13 +25,16 @@
 <body>
 
 
-<!-- HEADER -->
+<!-- ================= HEADER ================= -->
 
 <header class="header">
 
     <div class="logo">
+
         <span>DAILY NEWS</span>
-<strong>UPDATES</strong>
+
+        <strong>UPDATES</strong>
+
     </div>
 
 
@@ -55,43 +61,51 @@
 
     <div class="header-actions">
 
-    <button class="search-button"
-            onclick="openSearch()">
-        🔍 Search
-    </button>
+        <button
+            class="search-button"
+            onclick="openSearch()"
+            type="button"
+        >
+            🔍 Search
+        </button>
 
-    <button
-        class="theme-button"
-        id="themeButton"
-        onclick="toggleDarkMode()"
-        aria-label="Toggle dark mode">
-        🌙
-    </button>
 
-</div>
+        <button
+            class="theme-button"
+            id="themeButton"
+            onclick="toggleDarkMode()"
+            aria-label="Toggle dark mode"
+            type="button"
+        >
+            🌙
+        </button>
+
+    </div>
 
 </header>
 
 
 
-<!-- PAGE -->
+<!-- ================= PAGE ================= -->
 
 <main class="archive-page">
-
 
     <div class="archive-container">
 
 
-        <!-- HEADING -->
+        <!-- ================= HEADING ================= -->
 
         <div class="archive-heading">
 
             <p class="section-label">
-    DAILY NEWS UPDATES
-</p>
+                DAILY NEWS UPDATES
+            </p>
+
+
             <h1>
                 Previous News
             </h1>
+
 
             <p>
                 Browse previously published daily news.
@@ -101,13 +115,14 @@
 
 
 
-        <!-- FILTER -->
+        <!-- ================= FILTER ================= -->
 
         <div class="archive-filter">
 
             <label for="archiveCategory">
                 Category
             </label>
+
 
             <select id="archiveCategory">
 
@@ -153,22 +168,30 @@
 
 
 
-        <!-- NEWS GRID -->
+        <!-- ================= NEWS GRID ================= -->
 
-        <div class="archive-grid"
-     id="archiveGrid">
+        <div
+            class="archive-grid"
+            id="archiveGrid"
+        >
 
-    <div class="archive-loading">
-        <div class="loading-spinner"></div>
+            <div class="archive-loading">
 
-        <h3>Loading News...</h3>
+                <div class="loading-spinner"></div>
 
-        <p>
-            Please wait while we fetch the latest news.
-        </p>
-    </div>
 
-</div>
+                <h3>
+                    Loading News...
+                </h3>
+
+
+                <p>
+                    Please wait while we fetch the latest news.
+                </p>
+
+            </div>
+
+        </div>
 
 
     </div>
@@ -177,20 +200,23 @@
 
 
 
-<!-- FOOTER -->
+<!-- ================= FOOTER ================= -->
 
 <footer class="footer">
 
     <div class="logo">
 
         <span>DAILY NEWS</span>
-<strong>UPDATES</strong>
+
+        <strong>UPDATES</strong>
 
     </div>
+
 
     <p>
         Your daily source for news and updates.
     </p>
+
 
     <p class="copyright">
         © 2026 Daily News Updates. All rights reserved.
@@ -200,31 +226,54 @@
 
 
 
-<!-- SEARCH POPUP -->
+<!-- ================= SEARCH POPUP ================= -->
 
-<div class="search-popup"
-     id="searchPopup">
+<div
+    class="search-popup"
+    id="searchPopup"
+>
 
     <div class="search-box">
 
-        <button class="close-search"
-                onclick="closeSearch()">
 
+        <button
+            class="close-search"
+            onclick="closeSearch()"
+            aria-label="Close search"
+            type="button"
+        >
             ×
-
         </button>
+
+
+        <button
+            class="theme-button"
+            id="themeButton"
+            onclick="toggleDarkMode()"
+            aria-label="Toggle dark mode"
+            type="button"
+        >
+            🌙
+        </button>
+
 
         <h2>
             Search News
         </h2>
 
+
         <input
             type="text"
             placeholder="Search for news..."
             id="searchInput"
+            autocomplete="off"
         >
 
-        <button onclick="searchNews()">
+
+        <button
+            onclick="searchNews()"
+            type="button"
+        >
             Search
         </button>
 
@@ -234,8 +283,16 @@
 
 
 
+<!-- ================= JAVASCRIPT ================= -->
+
 <script src="script.js"></script>
-<script type="module" src="archive-news.js"></script>
+
+<script
+    type="module"
+    src="archive-news.js"
+></script>
+
+
 </body>
 
 </html>
