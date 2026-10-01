@@ -1,108 +1,267 @@
+/* =====================================================
+   SEARCH
+===================================================== */
+
 function openSearch() {
-  document.getElementById("searchPopup").style.display = "flex";
+
+    const popup =
+        document.getElementById("searchPopup");
+
+    const input =
+        document.getElementById("searchInput");
+
+    if (!popup) return;
+
+    popup.style.display = "flex";
+
+    /* Focus search box automatically */
+
+    if (input) {
+        setTimeout(() => {
+            input.focus();
+        }, 100);
+    }
 }
+
 
 function closeSearch() {
-  document.getElementById("searchPopup").style.display = "none";
+
+    const popup =
+        document.getElementById("searchPopup");
+
+    if (!popup) return;
+
+    popup.style.display = "none";
 }
+
 
 function searchNews() {
-  const searchText =
-    document.getElementById("searchInput").value.trim();
 
-  if (!searchText) {
-    alert("Please enter something to search.");
-    return;
-  }
+    const input =
+        document.getElementById("searchInput");
 
-  window.location.href =
-    `archive.html?search=${encodeURIComponent(searchText)}`;
+    if (!input) return;
+
+    const searchText =
+        input.value.trim();
+
+
+    if (!searchText) {
+
+        input.focus();
+
+        return;
+    }
+
+
+    window.location.href =
+        `archive.html?search=${encodeURIComponent(searchText)}`;
 }
+
+
+/* =====================================================
+   SEARCH USING ENTER KEY
+===================================================== */
+
+document.addEventListener(
+    "DOMContentLoaded",
+    () => {
+
+        const searchInput =
+            document.getElementById("searchInput");
+
+
+        if (searchInput) {
+
+            searchInput.addEventListener(
+                "keydown",
+                event => {
+
+                    if (event.key === "Enter") {
+
+                        event.preventDefault();
+
+                        searchNews();
+
+                    }
+
+                }
+            );
+
+        }
+
+    }
+);
+
+
+/* =====================================================
+   CLOSE SEARCH WITH ESCAPE
+===================================================== */
+
+document.addEventListener(
+    "keydown",
+    event => {
+
+        if (event.key === "Escape") {
+
+            closeSearch();
+
+        }
+
+    }
+);
+
+
+/* =====================================================
+   SHARE NEWS
+===================================================== */
 
 function shareNews() {
 
-  const shareData = {
-    title: document.title,
-    text: "Read this news from Daily News Updates.",
-    url: window.location.href
-  };
+    const shareData = {
 
-  if (navigator.share) {
+        title: document.title,
 
-    navigator.share(shareData)
-      .catch(error => {
-        console.log(
-          "Share cancelled:",
-          error
+        text:
+            "Read this news from Daily News Updates.",
+
+        url:
+            window.location.href
+
+    };
+
+
+    if (navigator.share) {
+
+        navigator.share(shareData)
+
+            .catch(error => {
+
+                console.log(
+                    "Share cancelled:",
+                    error
+                );
+
+            });
+
+    }
+
+    else if (navigator.clipboard) {
+
+        navigator.clipboard
+
+            .writeText(
+                window.location.href
+            )
+
+            .then(() => {
+
+                alert(
+                    "News link copied."
+                );
+
+            });
+
+    }
+
+    else {
+
+        alert(
+            "Copy this page URL to share the news."
         );
-      });
 
-  } else if (navigator.clipboard) {
+    }
 
-    navigator.clipboard
-      .writeText(window.location.href)
-      .then(() => {
-        alert("News link copied.");
-      });
-
-  } else {
-
-    alert(
-      "Copy this page URL to share the news."
-    );
-  }
 }
+
+
 /* =====================================================
    DARK MODE
 ===================================================== */
 
 function toggleDarkMode() {
 
-    document.body.classList.toggle("dark-mode");
+    document.body.classList.toggle(
+        "dark-mode"
+    );
+
 
     const isDark =
-        document.body.classList.contains("dark-mode");
+        document.body.classList.contains(
+            "dark-mode"
+        );
+
 
     localStorage.setItem(
         "darkMode",
-        isDark ? "enabled" : "disabled"
+        isDark
+            ? "enabled"
+            : "disabled"
     );
 
+
     updateThemeButton();
+
 }
 
 
 function updateThemeButton() {
 
-    const button =
-        document.getElementById("themeButton");
+    const buttons =
+        document.querySelectorAll(
+            "#themeButton"
+        );
 
-    if (!button) return;
+
+    if (!buttons.length) return;
+
 
     const isDark =
-        document.body.classList.contains("dark-mode");
+        document.body.classList.contains(
+            "dark-mode"
+        );
 
-    button.textContent =
-        isDark ? "☀️" : "🌙";
+
+    buttons.forEach(button => {
+
+        button.textContent =
+            isDark
+                ? "☀️"
+                : "🌙";
+
+    });
+
 }
 
 
-/* Load saved theme */
+/* =====================================================
+   LOAD SAVED DARK MODE
+===================================================== */
 
 function loadDarkMode() {
 
     const savedTheme =
-        localStorage.getItem("darkMode");
+        localStorage.getItem(
+            "darkMode"
+        );
+
 
     if (savedTheme === "enabled") {
 
         document.body.classList.add(
             "dark-mode"
         );
+
     }
 
+
     updateThemeButton();
+
 }
 
+
+/* =====================================================
+   START
+===================================================== */
 
 loadDarkMode();

@@ -8,18 +8,30 @@ import {
 import { db } from "./firebase-config.js";
 
 
+/* =========================================
+   ELEMENTS
+========================================= */
+
 const archiveGrid =
   document.getElementById("archiveGrid");
 
 const archiveCategory =
   document.getElementById("archiveCategory");
 
-let allNews = [];
 const archiveHeading =
   document.querySelector(".archive-heading h1");
 
 const archiveDescription =
-  document.querySelector(".archive-heading > p:last-child");
+  document.querySelector(
+    ".archive-heading > p:last-child"
+  );
+
+
+/* =========================================
+   ALL NEWS
+========================================= */
+
+let allNews = [];
 
 
 /* =========================================
@@ -41,13 +53,18 @@ function normalizeCategory(category) {
 
 function formatDate(dateString) {
 
-  if (!dateString) return "";
+  if (!dateString) {
+    return "";
+  }
 
-  const date = new Date(dateString);
+  const date =
+    new Date(dateString);
 
-  if (isNaN(date)) {
+
+  if (isNaN(date.getTime())) {
     return dateString;
   }
+
 
   return date.toLocaleDateString(
     "en-IN",
@@ -70,47 +87,148 @@ function categoryName(category) {
     return "News";
   }
 
+
   return String(category)
     .split(/[\s_-]+/)
-    .map(
-      word =>
-        word.charAt(0).toUpperCase() +
-        word.slice(1)
+    .map(word =>
+      word.charAt(0).toUpperCase() +
+      word.slice(1)
     )
     .join(" ");
 }
+
+
+/* =========================================
+   CATEGORY ICON
+========================================= */
+
 function getCategoryIcon(category) {
 
-    const value =
-        String(category || "")
-            .toLowerCase();
+  const value =
+    String(category || "")
+      .toLowerCase();
 
-    if (value.includes("politics"))
-        return "🏛️";
 
-    if (value.includes("sports"))
-        return "🏏";
+  if (value.includes("politics")) {
+    return "🏛️";
+  }
 
-    if (value.includes("technology"))
-        return "💻";
+  if (value.includes("sports")) {
+    return "🏏";
+  }
 
-    if (value.includes("business"))
-        return "💰";
+  if (value.includes("technology")) {
+    return "💻";
+  }
 
-    if (value.includes("education"))
-        return "🎓";
+  if (value.includes("business")) {
+    return "💰";
+  }
 
-    if (value.includes("world"))
-        return "🌍";
+  if (value.includes("education")) {
+    return "🎓";
+  }
 
-    if (value.includes("india"))
-        return "🇮🇳";
+  if (value.includes("world")) {
+    return "🌍";
+  }
 
-    if (value.includes("tamil"))
-        return "📍";
+  if (value.includes("india")) {
+    return "🇮🇳";
+  }
 
-    return "📰";
+  if (value.includes("tamil")) {
+    return "📍";
+  }
+
+  return "📰";
 }
+
+
+/* =========================================
+   GET URL SEARCH
+========================================= */
+
+function getSearchText() {
+
+  return new URLSearchParams(
+    window.location.search
+  )
+    .get("search")
+    ?.trim()
+    .toLowerCase() || "";
+}
+
+
+/* =========================================
+   GET URL CATEGORY
+========================================= */
+
+function getRequestedCategory() {
+
+  return new URLSearchParams(
+    window.location.search
+  )
+    .get("category") || "";
+}
+
+
+/* =========================================
+   UPDATE PAGE HEADING
+========================================= */
+
+function updateArchiveHeading(
+  searchText,
+  selectedCategory
+) {
+
+  if (!archiveHeading ||
+      !archiveDescription) {
+    return;
+  }
+
+
+  /* SEARCH */
+
+  if (searchText) {
+
+    archiveHeading.textContent =
+      "Search Results";
+
+    archiveDescription.textContent =
+      `Showing results for "${searchText}"`;
+
+    return;
+  }
+
+
+  /* CATEGORY */
+
+  if (
+    selectedCategory &&
+    selectedCategory !== "all" &&
+    selectedCategory !== "all-categories"
+  ) {
+
+    archiveHeading.textContent =
+      `${categoryName(selectedCategory)} News`;
+
+    archiveDescription.textContent =
+      `Browse the latest ${categoryName(selectedCategory).toLowerCase()} news.`;
+
+    return;
+  }
+
+
+  /* DEFAULT */
+
+  archiveHeading.textContent =
+    "Previous News";
+
+  archiveDescription.textContent =
+    "Browse previously published daily news.";
+}
+
 
 /* =========================================
    RENDER NEWS
@@ -118,19 +236,40 @@ function getCategoryIcon(category) {
 
 function renderNews() {
 
-  if (!archiveCategory) {
+  if (!archiveGrid) {
     return;
   }
 
 
   const selectedCategory =
     normalizeCategory(
-      archiveCategory.value
+      archiveCategory
+        ? archiveCategory.value
+        : "all"
     );
 
 
+  const searchText =
+    getSearchText();
+
+
   console.log(
-    "Selected category:",
+    "Category:",
+    selectedCategory
+  );
+
+  console.log(
+    "Search:",
+    searchText
+  );
+
+
+  /* =====================================
+     UPDATE HEADING
+  ===================================== */
+
+  updateArchiveHeading(
+    searchText,
     selectedCategory
   );
 
@@ -144,10 +283,12 @@ function renderNews() {
 
   if (
     selectedCategory === "all" ||
-    selectedCategory === "all-categories"
+    selectedCategory === "all-categories" ||
+    selectedCategory === ""
   ) {
 
-    newsToShow = [...allNews];
+    newsToShow =
+      [...allNews];
 
   } else {
 
@@ -159,17 +300,14 @@ function renderNews() {
             news.category
           );
 
-        console.log(
-          news.title,
-          "=>",
-          newsCategory
-        );
 
         return (
           newsCategory ===
           selectedCategory
         );
+
       });
+
   }
 
 
@@ -177,53 +315,29 @@ function renderNews() {
      SEARCH FILTER
   ===================================== */
 
-  const searchText =
-    new URLSearchParams(
-      window.location.search
-    )
-      .get("search")
-      ?.trim()
-      .toLowerCase() || "";
-      if (searchText) {
-  if (archiveHeading) {
-    archiveHeading.textContent =
-      `Search Results`;
-  }
-
-  if (archiveDescription) {
-    archiveDescription.textContent =
-      `Showing results for "${searchText}"`;
-  }
-} else {
-  if (archiveHeading) {
-    archiveHeading.textContent =
-      "Previous News";
-  }
-
-  if (archiveDescription) {
-    archiveDescription.textContent =
-      "Browse previously published daily news.";
-  }
-}
-
-
   if (searchText) {
 
     newsToShow =
       newsToShow.filter(news => {
 
-        const searchableText =
-          `
+        const searchableText = `
+
           ${news.title || ""}
+
           ${news.category || ""}
+
           ${news.description || ""}
+
           ${news.source || ""}
-          `
-            .toLowerCase();
+
+        `.toLowerCase();
+
 
         return searchableText
           .includes(searchText);
+
       });
+
   }
 
 
@@ -234,19 +348,37 @@ function renderNews() {
   if (newsToShow.length === 0) {
 
     archiveGrid.innerHTML = `
-    <div class="archive-empty">
+
+      <div class="archive-empty">
 
         <h3>
-            ⚠️ Unable to Load News
+          No News Found
         </h3>
 
         <p>
-            We couldn't connect to the news service.
-            Please refresh the page and try again.
+          ${
+            searchText
+              ? `No news matched "${searchText}".`
+              : "There are no news articles in this category yet."
+          }
         </p>
 
-    </div>
-`;
+        ${
+          searchText
+            ? `
+              <button
+                class="read-button"
+                onclick="window.location.href='archive.html'"
+              >
+                View All News
+              </button>
+            `
+            : ""
+        }
+
+      </div>
+
+    `;
 
     return;
   }
@@ -272,6 +404,7 @@ function renderNews() {
 
           readerLink =
             `reader.html?id=${encodeURIComponent(news.id)}`;
+
         }
 
 
@@ -282,37 +415,43 @@ function renderNews() {
 
 
         return `
+
           <article class="publication-item">
 
             <div>
 
               <p class="news-category">
-    ${getCategoryIcon(news.category)}
-    ${categoryName(news.category)}
-</p>
+
+                ${getCategoryIcon(news.category)}
+
+                ${categoryName(news.category)}
+
+              </p>
 
 
               <strong>
-    ${news.title || "Latest News"}
-</strong>
+                ${news.title || "Latest News"}
+              </strong>
 
-<div class="news-meta">
 
-    <span>
-        📅 ${formatDate(news.date)}
-    </span>
+              <div class="news-meta">
 
-    ${
-        news.source
-            ? `
                 <span>
-                    📰 ${news.source}
+                  📅 ${formatDate(news.date)}
                 </span>
-              `
-            : ""
-    }
 
-</div>
+
+                ${
+                  news.source
+                    ? `
+                      <span>
+                        📰 ${news.source}
+                      </span>
+                    `
+                    : ""
+                }
+
+              </div>
 
 
               ${
@@ -336,7 +475,9 @@ function renderNews() {
             </a>
 
           </article>
+
         `;
+
       })
       .join("");
 }
@@ -395,7 +536,9 @@ async function loadAutomaticNews() {
 
         sourceUrl:
           data.sourceUrl || ""
+
       };
+
     }
   );
 }
@@ -451,14 +594,16 @@ async function loadPdfNews() {
 
         pdfUrl:
           data.pdfUrl || ""
+
       };
+
     }
   );
 }
 
 
 /* =========================================
-   LOAD BOTH NEWS COLLECTIONS
+   LOAD BOTH COLLECTIONS
 ========================================= */
 
 async function loadArchive() {
@@ -509,6 +654,53 @@ async function loadArchive() {
     );
 
 
+    /* SET CATEGORY FROM URL */
+
+    const requestedCategory =
+      getRequestedCategory();
+
+
+    if (
+      requestedCategory &&
+      archiveCategory
+    ) {
+
+      const requested =
+        normalizeCategory(
+          requestedCategory
+        );
+
+
+      const matchingOption =
+        [
+          ...archiveCategory.options
+        ].find(option => {
+
+          return (
+            normalizeCategory(
+              option.value
+            ) === requested ||
+
+            normalizeCategory(
+              option.textContent
+            ) === requested
+          );
+
+        });
+
+
+      if (matchingOption) {
+
+        archiveCategory.value =
+          matchingOption.value;
+
+      }
+
+    }
+
+
+    /* DISPLAY */
+
     renderNews();
 
 
@@ -520,20 +712,28 @@ async function loadArchive() {
     );
 
 
-    archiveGrid.innerHTML = `
-      <div class="archive-empty">
+    if (archiveGrid) {
 
-        <h3>
-          Unable to load news
-        </h3>
+      archiveGrid.innerHTML = `
 
-        <p>
-          Please try again later.
-        </p>
+        <div class="archive-empty">
 
-      </div>
-    `;
+          <h3>
+            Unable to Load News
+          </h3>
+
+          <p>
+            Please try again later.
+          </p>
+
+        </div>
+
+      `;
+
+    }
+
   }
+
 }
 
 
@@ -547,48 +747,7 @@ if (archiveCategory) {
     "change",
     renderNews
   );
-}
 
-
-/* =========================================
-   CATEGORY FROM URL
-========================================= */
-
-const requestedCategory =
-  new URLSearchParams(
-    window.location.search
-  ).get("category");
-
-
-if (requestedCategory) {
-
-  const requested =
-    normalizeCategory(
-      requestedCategory
-    );
-
-
-  const matchingOption =
-    [
-      ...archiveCategory.options
-    ].find(option => {
-
-      return (
-        normalizeCategory(
-          option.value
-        ) === requested ||
-        normalizeCategory(
-          option.textContent
-        ) === requested
-      );
-    });
-
-
-  if (matchingOption) {
-
-    archiveCategory.value =
-      matchingOption.value;
-  }
 }
 
 
