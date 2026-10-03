@@ -3,13 +3,13 @@ name: Fetch Latest News
 on:
   workflow_dispatch:
   schedule:
-    # 10:30 AM IST = 05:00 UTC
+    # F1: 10:30 AM IST = 05:00 UTC
     - cron: "0 5 * * *"
 
-    # 6:30 PM IST = 13:00 UTC
+    # F2: 6:30 PM IST = 13:00 UTC
     - cron: "0 13 * * *"
 
-    # 10:30 PM IST = 17:00 UTC
+    # F3: 10:30 PM IST = 17:00 UTC
     - cron: "0 17 * * *"
 
 jobs:
@@ -29,9 +29,28 @@ jobs:
         working-directory: functions
         run: npm install
 
+      - name: Set news batch
+        shell: bash
+        env:
+          SCHEDULE: ${{ github.event.schedule }}
+        run: |
+          if [ "$SCHEDULE" = "0 5 * * *" ]; then
+            echo "NEWS_BATCH=F1" >> "$GITHUB_ENV"
+          elif [ "$SCHEDULE" = "0 13 * * *" ]; then
+            echo "NEWS_BATCH=F2" >> "$GITHUB_ENV"
+          elif [ "$SCHEDULE" = "0 17 * * *" ]; then
+            echo "NEWS_BATCH=F3" >> "$GITHUB_ENV"
+          else
+            echo "NEWS_BATCH=" >> "$GITHUB_ENV"
+          fi
+
+          echo "Triggered schedule: $SCHEDULE"
+          echo "News batch: $NEWS_BATCH"
+
       - name: Fetch news
         working-directory: functions
         env:
           NEWSDATA_API_KEY: ${{ secrets.NEWSDATA_API_KEY }}
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          NEWS_BATCH: ${{ env.NEWS_BATCH }}
         run: node fetch-news.js

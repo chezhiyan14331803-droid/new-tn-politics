@@ -320,11 +320,10 @@ const day = Number(getPart("day"));
 const hour = Number(getPart("hour"));
 const minute = Number(getPart("minute"));
 
-const today =
+let today =
   `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 
-
-let fetchBatch = "";
+let fetchBatch = process.env.NEWS_BATCH || "";
 
 let startHour = 0;
 let startMinute = 0;
@@ -334,69 +333,139 @@ let endMinute = 0;
 
 
 // =====================================================
-// F1
-// News published between 6:00 AM and 10:00 AM
-// Workflow runs at 10:30 AM
+// SCHEDULED BATCH
 // =====================================================
 
-if (
-  hour >= 10 &&
-  hour < 12
-) {
+if (fetchBatch === "F1") {
 
-  fetchBatch = "F1";
-
+  // News published between 6:00 AM and 10:00 AM
   startHour = 6;
   startMinute = 0;
 
   endHour = 10;
   endMinute = 0;
+
 }
 
+else if (fetchBatch === "F2") {
 
-// =====================================================
-// F2
-// News published between 11:00 AM and 5:30 PM
-// Workflow runs at 6:30 PM
-// =====================================================
-
-else if (
-  hour >= 18 &&
-  hour < 20
-) {
-
-  fetchBatch = "F2";
-
+  // News published between 11:00 AM and 5:30 PM
   startHour = 11;
   startMinute = 0;
 
   endHour = 17;
   endMinute = 30;
+
 }
 
+else if (fetchBatch === "F3") {
 
-// =====================================================
-// F3
-// News published between 6:00 PM and 10:00 PM
-// Workflow runs at 10:30 PM
-// =====================================================
-
-else if (
-  hour >= 22
-) {
-
-  fetchBatch = "F3";
-
+  // News published between 6:00 PM and 10:00 PM
   startHour = 18;
   startMinute = 0;
 
   endHour = 22;
   endMinute = 0;
+
+
+  // ---------------------------------------------------
+  // IMPORTANT:
+  // If GitHub delays the F3 workflow until after
+  // midnight, the F3 batch belongs to yesterday.
+  // ---------------------------------------------------
+
+  if (hour < 6) {
+
+    const previousDay = new Date(
+      year,
+      month - 1,
+      day
+    );
+
+    previousDay.setDate(
+      previousDay.getDate() - 1
+    );
+
+    today =
+      `${previousDay.getFullYear()}-${String(
+        previousDay.getMonth() + 1
+      ).padStart(2, "0")}-${String(
+        previousDay.getDate()
+      ).padStart(2, "0")}`;
+
+    console.log(
+      "🌙 F3 workflow was delayed past midnight."
+    );
+
+    console.log(
+      "📅 Using previous day's date for F3:",
+      today
+    );
+  }
+
+}
+
+
+// =====================================================
+// MANUAL RUN FALLBACK
+// =====================================================
+
+// If NEWS_BATCH is empty, this is most likely a
+// manual workflow run.
+//
+// Keep the old time-based behaviour for manual testing.
+
+if (!fetchBatch) {
+
+  if (
+    hour >= 10 &&
+    hour < 12
+  ) {
+
+    fetchBatch = "F1";
+
+    startHour = 6;
+    startMinute = 0;
+
+    endHour = 10;
+    endMinute = 0;
+
+  }
+
+  else if (
+    hour >= 18 &&
+    hour < 20
+  ) {
+
+    fetchBatch = "F2";
+
+    startHour = 11;
+    startMinute = 0;
+
+    endHour = 17;
+    endMinute = 30;
+
+  }
+
+  else if (
+    hour >= 22
+  ) {
+
+    fetchBatch = "F3";
+
+    startHour = 18;
+    startMinute = 0;
+
+    endHour = 22;
+    endMinute = 0;
+
+  }
+
 }
 
 
 console.log("=================================");
-console.log("TODAY:", today);
+console.log("TODAY / TARGET DATE:", today);
 console.log("BATCH:", fetchBatch);
 console.log("CURRENT IST HOUR:", hour);
 console.log("CURRENT IST MINUTE:", minute);
