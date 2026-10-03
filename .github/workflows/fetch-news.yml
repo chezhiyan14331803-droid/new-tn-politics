@@ -6,22 +6,17 @@ on:
       news_batch:
         description: "Select news batch to fetch"
         required: true
-        default: "F1"
+        default: "AUTO"
         type: choice
         options:
+          - AUTO
           - F1
           - F2
           - F3
 
   schedule:
-    # F1: 10:30 AM IST = 05:00 UTC
-    - cron: "0 5 * * *"
-
-    # F2: 6:30 PM IST = 13:00 UTC
-    - cron: "0 13 * * *"
-
-    # F3: 10:30 PM IST = 17:00 UTC
-    - cron: "0 17 * * *"
+    # Run every 30 minutes throughout the day
+    - cron: "*/30 * * * *"
 
 jobs:
   fetch-news:
@@ -46,25 +41,21 @@ jobs:
           SCHEDULE: ${{ github.event.schedule }}
           MANUAL_BATCH: ${{ inputs.news_batch }}
         run: |
-          if [ -n "$MANUAL_BATCH" ]; then
-            echo "NEWS_BATCH=$MANUAL_BATCH" >> "$GITHUB_ENV"
-            echo "Manual batch selected: $MANUAL_BATCH"
-
-          elif [ "$SCHEDULE" = "0 5 * * *" ]; then
+          if [ "$MANUAL_BATCH" = "F1" ]; then
             echo "NEWS_BATCH=F1" >> "$GITHUB_ENV"
-            echo "Scheduled batch: F1"
+            echo "Manual batch selected: F1"
 
-          elif [ "$SCHEDULE" = "0 13 * * *" ]; then
+          elif [ "$MANUAL_BATCH" = "F2" ]; then
             echo "NEWS_BATCH=F2" >> "$GITHUB_ENV"
-            echo "Scheduled batch: F2"
+            echo "Manual batch selected: F2"
 
-          elif [ "$SCHEDULE" = "0 17 * * *" ]; then
+          elif [ "$MANUAL_BATCH" = "F3" ]; then
             echo "NEWS_BATCH=F3" >> "$GITHUB_ENV"
-            echo "Scheduled batch: F3"
+            echo "Manual batch selected: F3"
 
           else
-            echo "NEWS_BATCH=" >> "$GITHUB_ENV"
-            echo "No batch selected"
+            echo "NEWS_BATCH=AUTO" >> "$GITHUB_ENV"
+            echo "Automatic batch selection enabled"
           fi
 
       - name: Fetch news
