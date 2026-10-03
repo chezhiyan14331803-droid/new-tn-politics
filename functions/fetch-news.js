@@ -1,5 +1,5 @@
 const admin = require("firebase-admin");
-
+const cheerio = require("cheerio");
 console.log("🔥 CURRENTS API VERSION 2 IS RUNNING 🔥");
 
 // =====================================================
@@ -523,7 +523,117 @@ async function fetchCurrents(
 // =====================================================
 // GET ARTICLES FOR ONE TIME WINDOW
 // =====================================================
+// =====================================================
+// FETCH FULL ARTICLE DESCRIPTION
+// =====================================================
 
+async function fetchFullArticleDescription(url) {
+  if (!url) {
+    return "";
+  }
+
+  try {
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36",
+        "Accept":
+          "text/html,application/xhtml+xml"
+      },
+      redirect: "follow"
+    });
+
+    if (!response.ok) {
+      console.log(
+        `⚠️ Article page returned ${response.status}: ${url}`
+      );
+      return "";
+    }
+
+    const html = await response.text();
+
+    const $ = cheerio.load(html);
+
+    // Remove elements that are not article content
+    $(
+      "script, style, noscript, iframe, nav, header, footer, aside, form"
+    ).remove();
+
+    let paragraphs = [];
+
+    // First try common article containers
+    const selectors = [
+      "article p",
+      "[itemprop='articleBody'] p",
+      ".article-body p",
+      ".article-content p",
+      ".story-body p",
+      ".story-content p",
+      ".post-content p",
+      ".entry-content p",
+      "main p"
+    ];
+
+    for (const selector of selectors) {
+      const found = [];
+
+      $(selector).each((index, element) => {
+        const text = $(element)
+          .text()
+          .replace(/\s+/g, " ")
+          .trim();
+
+        if (text.length >= 40) {
+          found.push(text);
+        }
+      });
+
+      if (found.length >= 2) {
+        paragraphs = found;
+        break;
+      }
+    }
+
+    // Fallback: collect useful paragraphs from the page
+    if (paragraphs.length === 0) {
+      $("p").each((index, element) => {
+        const text = $(element)
+          .text()
+          .replace(/\s+/g, " ")
+          .trim();
+
+        if (text.length >= 40) {
+          paragraphs.push(text);
+        }
+      });
+    }
+
+    if (paragraphs.length === 0) {
+      return "";
+    }
+
+    // Remove duplicate paragraphs
+    paragraphs = [...new Set(paragraphs)];
+
+    // Keep the first useful article paragraphs.
+    // This prevents menus, comments and unrelated page text
+    // from becoming the news description.
+    const description = paragraphs
+      .slice(0, 8)
+      .join(" ")
+      .trim();
+
+    // Limit extremely long pages
+    return description.slice(0, 5000);
+
+  } catch (error) {
+    console.log(
+      `⚠️ Could not fetch article content: ${url}`
+    );
+
+    return "";
+  }
+}
 async function getArticlesForWindow(
   apiKey,
   dateInfo,
@@ -742,11 +852,25 @@ async function saveArticles(
     }
 
     const category =
-      getCategory(article);
+  getCategory(article);
 
-    console.log(
-      `✅ ${batchName}: ${article.title}`
-    );
+console.log(
+  `📰 Fetching full article content: ${article.title}`
+);
+
+const fullDescription =
+  await fetchFullArticleDescription(
+    article.url
+  );
+
+const finalDescription =
+  fullDescription ||
+  article.description ||
+  "";
+
+console.log(
+  `✅ ${batchName}: ${article.title}`
+);
 
     batch.set(
       newsRef,
@@ -756,8 +880,7 @@ async function saveArticles(
           "Untitled",
 
         description:
-          article.description ||
-          "",
+          finalDescription,
 
         source:
           getSourceName(article),
