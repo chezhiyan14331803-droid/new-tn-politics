@@ -15,7 +15,7 @@ on:
           - F3
 
   schedule:
-    # Run every 30 minutes throughout the day
+    # Run every 30 minutes
     - cron: "*/30 * * * *"
 
 jobs:
@@ -23,6 +23,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+
       - name: Checkout project
         uses: actions/checkout@v4
 
@@ -38,30 +39,43 @@ jobs:
       - name: Set news batch
         shell: bash
         env:
-          SCHEDULE: ${{ github.event.schedule }}
           MANUAL_BATCH: ${{ inputs.news_batch }}
         run: |
+
           if [ "$MANUAL_BATCH" = "F1" ]; then
+
             echo "NEWS_BATCH=F1" >> "$GITHUB_ENV"
+
             echo "Manual batch selected: F1"
 
           elif [ "$MANUAL_BATCH" = "F2" ]; then
+
             echo "NEWS_BATCH=F2" >> "$GITHUB_ENV"
+
             echo "Manual batch selected: F2"
 
           elif [ "$MANUAL_BATCH" = "F3" ]; then
+
             echo "NEWS_BATCH=F3" >> "$GITHUB_ENV"
+
             echo "Manual batch selected: F3"
 
           else
+
             echo "NEWS_BATCH=AUTO" >> "$GITHUB_ENV"
+
             echo "Automatic batch selection enabled"
+
           fi
 
       - name: Fetch news
         working-directory: functions
         env:
-          NEWSDATA_API_KEY: ${{ secrets.NEWSDATA_API_KEY }}
+
+          CURRENTS_API_KEY: ${{ secrets.CURRENTS_API_KEY }}
+
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+
           NEWS_BATCH: ${{ env.NEWS_BATCH }}
+
         run: node fetch-news.js

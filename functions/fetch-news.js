@@ -1,6 +1,6 @@
 const admin = require("firebase-admin");
 
-console.log("🔥 CATEGORY VERSION 6 IS RUNNING 🔥");
+console.log("🔥 CURRENTS API VERSION 1 IS RUNNING 🔥");
 
 // =====================================================
 // FIREBASE INITIALIZATION
@@ -36,6 +36,7 @@ const indiaTime = new Intl.DateTimeFormat("en-IN", {
   day: "2-digit",
   hour: "2-digit",
   minute: "2-digit",
+  second: "2-digit",
   hour12: false
 }).formatToParts(now);
 
@@ -66,13 +67,11 @@ const currentMinute =
 // =====================================================
 
 function makeDateString(year, month, day) {
-
   return (
     `${year}-` +
     `${String(month).padStart(2, "0")}-` +
     `${String(day).padStart(2, "0")}`
   );
-
 }
 
 
@@ -81,7 +80,6 @@ function getPreviousDate(
   month,
   day
 ) {
-
   const date = new Date(
     Date.UTC(
       year,
@@ -99,7 +97,6 @@ function getPreviousDate(
     month: date.getUTCMonth() + 1,
     day: date.getUTCDate()
   };
-
 }
 
 
@@ -134,24 +131,83 @@ const BATCHES = {
 
 
 // =====================================================
-// CONVERT ARTICLE PUBDATE TO IST PARTS
+// CURRENTS SEARCH WINDOWS
 // =====================================================
 
-function getArticleIST(article) {
+function makeUTCDate(
+  year,
+  month,
+  day,
+  hour,
+  minute,
+  second = 0
+) {
 
-  if (!article.pubDate) {
+  // IST = UTC + 5:30
+  const utc =
+    new Date(
+      Date.UTC(
+        year,
+        month - 1,
+        day,
+        hour - 5,
+        minute - 30,
+        second
+      )
+    );
+
+  return utc.toISOString();
+
+}
+
+
+// =====================================================
+// ARTICLE PUBLICATION DATE
+// =====================================================
+
+function getArticleDate(article) {
+
+  if (!article.published) {
     return null;
   }
 
-  const published =
-    new Date(article.pubDate);
+  let published =
+    article.published;
+
+  // Currents normally returns:
+  // 2026-10-03 05:20:00 +0000
+  //
+  // Convert it to:
+  // 2026-10-03T05:20:00+00:00
+
+  if (
+    typeof published === "string"
+  ) {
+
+    published =
+      published
+        .replace(
+          " ",
+          "T"
+        )
+        .replace(
+          /([+-]\d{2})(\d{2})$/,
+          "$1:$2"
+        );
+
+  }
+
+  const date =
+    new Date(published);
 
   if (
     isNaN(
-      published.getTime()
+      date.getTime()
     )
   ) {
+
     return null;
+
   }
 
   const parts =
@@ -164,9 +220,10 @@ function getArticleIST(article) {
         day: "2-digit",
         hour: "2-digit",
         minute: "2-digit",
+        second: "2-digit",
         hour12: false
       }
-    ).formatToParts(published);
+    ).formatToParts(date);
 
   function part(name) {
 
@@ -184,7 +241,10 @@ function getArticleIST(article) {
     month: part("month"),
     day: part("day"),
     hour: part("hour"),
-    minute: part("minute")
+    minute: part("minute"),
+    second: part("second"),
+
+    dateObject: date
 
   };
 
@@ -198,7 +258,7 @@ function getArticleIST(article) {
 function getArticleBatch(article) {
 
   const india =
-    getArticleIST(article);
+    getArticleDate(article);
 
   if (!india) {
     return null;
@@ -257,7 +317,6 @@ function getCategory(article) {
   const text = `
     ${article.title || ""}
     ${article.description || ""}
-    ${article.content || ""}
     ${
       Array.isArray(article.category)
         ? article.category.join(" ")
@@ -382,7 +441,16 @@ function getCategory(article) {
     text.includes("erode") ||
     text.includes("vellore") ||
     text.includes("thoothukudi") ||
-    text.includes("tirunelveli")
+    text.includes("tirunelveli") ||
+    text.includes("dindigul") ||
+    text.includes("thanjavur") ||
+    text.includes("kanchipuram") ||
+    text.includes("cuddalore") ||
+    text.includes("namakkal") ||
+    text.includes("karur") ||
+    text.includes("sivaganga") ||
+    text.includes("virudhunagar") ||
+    text.includes("ramanathapuram")
   ) {
 
     return "Tamil Nadu";
@@ -433,6 +501,48 @@ function getCategory(article) {
 
 
   return "Tamil Nadu";
+
+}
+
+
+// =====================================================
+// EXTRACT SOURCE NAME FROM URL
+// =====================================================
+
+function getSourceName(article) {
+
+  if (
+    article.source &&
+    typeof article.source === "string"
+  ) {
+
+    return article.source;
+
+  }
+
+  if (!article.url) {
+    return "Unknown source";
+  }
+
+  try {
+
+    const hostname =
+      new URL(
+        article.url
+      ).hostname
+        .replace(
+          /^www\./,
+          ""
+        );
+
+    return hostname;
+
+  }
+  catch {
+
+    return "Unknown source";
+
+  }
 
 }
 
@@ -593,33 +703,64 @@ async function deleteOldNews() {
 
 
 // =====================================================
-// FETCH NEWSDATA PAGE
+// FETCH CURRENTS SEARCH
 // =====================================================
 
-async function fetchPage(
+async function fetchCurrents(
   apiKey,
-  page
+  startDate,
+  endDate
 ) {
 
-  let url =
-    `https://newsdata.io/api/1/latest?q=Tamil%20Nadu&country=in&language=en&timezone=Asia/Kolkata&size=10&apikey=${apiKey}`;
+  const params =
+    new URLSearchParams({
 
-  if (page) {
+      keywords:
+        "\"Tamil Nadu\" OR Chennai OR Coimbatore OR Madurai OR Salem OR Tiruppur OR Trichy OR Tamilnadu",
 
-    url +=
-      `&page=${encodeURIComponent(page)}`;
+      country:
+        "IN",
 
-  }
+      language:
+        "en",
+
+      start_date:
+        startDate,
+
+      end_date:
+        endDate,
+
+      page_number:
+        "1",
+
+      page_size:
+        "20"
+
+    });
+
+
+  const url =
+    `https://api.currentsapi.services/v1/search?${params.toString()}`;
 
 
   const response =
-    await fetch(url);
+    await fetch(
+      url,
+      {
+        headers: {
+          Authorization:
+            `Bearer ${apiKey}`,
+          Accept:
+            "application/json"
+        }
+      }
+    );
 
 
   if (!response.ok) {
 
     throw new Error(
-      `NewsData API request failed: ${response.status}`
+      `Currents API request failed: ${response.status}`
     );
 
   }
@@ -635,139 +776,130 @@ async function fetchPage(
 
     throw new Error(
       data.message ||
-      "NewsData API returned an error."
+      data.msg ||
+      "Currents API returned an error."
     );
 
   }
 
 
-  return data;
+  return data.news || [];
 
 }
 
 
 // =====================================================
-// FETCH AVAILABLE ARTICLES
+// GET ARTICLES FOR ONE TIME WINDOW
 // =====================================================
 
-async function getAvailableArticles(
-  apiKey
+async function getArticlesForWindow(
+  apiKey,
+  dateInfo,
+  batchName
 ) {
 
-  const allArticles = [];
-
-  const seenIds =
-    new Set();
-
-  let page = null;
-
-  const MAX_PAGES = 5;
+  const batch =
+    BATCHES[batchName];
 
 
-  for (
-    let pageNumber = 1;
-    pageNumber <= MAX_PAGES;
-    pageNumber++
-  ) {
+  // Request slightly beyond the upper boundary.
+  // JavaScript will perform the exact final filtering.
 
-    console.log(
-      `📄 Fetching NewsData page ${pageNumber}...`
+  const startDate =
+    makeUTCDate(
+      dateInfo.year,
+      dateInfo.month,
+      dateInfo.day,
+      batch.startHour,
+      batch.startMinute,
+      0
     );
 
 
-    const data =
-      await fetchPage(
-        apiKey,
-        page
-      );
-
-
-    const articles =
-      data.results || [];
-
-
-    console.log(
-      `Page ${pageNumber}: ${articles.length} article(s)`
+  const endDate =
+    makeUTCDate(
+      dateInfo.year,
+      dateInfo.month,
+      dateInfo.day,
+      batch.endHour,
+      batch.endMinute + 1,
+      0
     );
 
 
-    for (
-      const article of articles
-    ) {
+  console.log(
+    `🔎 Searching Currents for ${batchName}`
+  );
 
-      const id =
-        article.article_id ||
-        article.link ||
-        article.title;
-
-
-      if (
-        !seenIds.has(id)
-      ) {
-
-        seenIds.add(id);
-
-        allArticles.push(
-          article
-        );
-
-        console.log(
-          `${article.pubDate} | ${article.title}`
-        );
-
-      }
-
-    }
+  console.log(
+    `   IST window: ${makeDateString(
+      dateInfo.year,
+      dateInfo.month,
+      dateInfo.day
+    )} ${String(batch.startHour).padStart(2, "0")}:${String(batch.startMinute).padStart(2, "0")} - ${String(batch.endHour).padStart(2, "0")}:${String(batch.endMinute).padStart(2, "0")}`
+  );
 
 
-    page =
-      data.nextPage || null;
+  const articles =
+    await fetchCurrents(
+      apiKey,
+      startDate,
+      endDate
+    );
 
 
-    if (!page) {
-
-      console.log(
-        "ℹ️ No more NewsData pages available."
-      );
-
-      break;
-
-    }
-
-  }
+  console.log(
+    `   Currents returned: ${articles.length}`
+  );
 
 
-  return allArticles;
+  return articles;
 
 }
 
 
 // =====================================================
-// GET FIRESTORE DOCUMENT ID
+// EXACT ARTICLE MATCH
 // =====================================================
 
-function getArticleId(article) {
+function articleMatches(
+  article,
+  targetDate,
+  batchName
+) {
+
+  const india =
+    getArticleDate(
+      article
+    );
+
+  if (!india) {
+    return false;
+  }
+
+
+  const articleDate =
+    makeDateString(
+      india.year,
+      india.month,
+      india.day
+    );
+
 
   if (
-    article.article_id
+    articleDate !== targetDate
   ) {
 
-    return article.article_id;
+    return false;
 
   }
 
 
-  return Buffer.from(
-    article.link ||
-    article.title ||
-    Date.now().toString()
-  )
-    .toString("base64")
-    .replace(
-      /[^a-zA-Z0-9]/g,
-      ""
-    )
-    .slice(0, 50);
+  return (
+    getArticleBatch(
+      article
+    ) === batchName
+  );
 
 }
 
@@ -805,7 +937,9 @@ async function saveArticles(
   ) {
 
     const id =
-      getArticleId(article);
+      article.id ||
+      article.url ||
+      article.title;
 
 
     if (
@@ -852,7 +986,18 @@ async function saveArticles(
   ) {
 
     const articleId =
-      getArticleId(article);
+      article.id ||
+      Buffer.from(
+        article.url ||
+        article.title ||
+        Date.now().toString()
+      )
+        .toString("base64")
+        .replace(
+          /[^a-zA-Z0-9]/g,
+          ""
+        )
+        .slice(0, 50);
 
 
     const newsRef =
@@ -889,7 +1034,9 @@ async function saveArticles(
 
 
     const category =
-      getCategory(article);
+      getCategory(
+        article
+      );
 
 
     console.log(
@@ -910,27 +1057,26 @@ async function saveArticles(
           "",
 
         source:
-          article.source_name ||
-          "Unknown source",
+          getSourceName(
+            article
+          ),
 
         sourceUrl:
-          article.link ||
+          article.url ||
           "",
 
         publishedAt:
-          article.pubDate ||
+          article.published ||
           "",
 
         savedAt:
-
           savedAt,
 
         category:
-
           category,
 
         imageUrl:
-          article.image_url ||
+          article.image ||
           "",
 
         updatedAt:
@@ -964,19 +1110,75 @@ async function saveArticles(
 
 
 // =====================================================
+// PROCESS ONE BATCH
+// =====================================================
+
+async function processBatch(
+  apiKey,
+  dateInfo,
+  batchName
+) {
+
+  const targetDate =
+    makeDateString(
+      dateInfo.year,
+      dateInfo.month,
+      dateInfo.day
+    );
+
+
+  const articles =
+    await getArticlesForWindow(
+      apiKey,
+      dateInfo,
+      batchName
+    );
+
+
+  const matches =
+    articles.filter(
+      article =>
+        articleMatches(
+          article,
+          targetDate,
+          batchName
+        )
+    );
+
+
+  console.log(
+    `📊 ${batchName} exact matches: ${matches.length}`
+  );
+
+
+  return saveArticles(
+    matches,
+    batchName
+  );
+
+}
+
+
+// =====================================================
 // AUTO MODE
 // =====================================================
 
 async function processAuto(
-  articles
+  apiKey
 ) {
 
-  const today =
-    makeDateString(
+  const today = {
+
+    year:
       currentYear,
+
+    month:
       currentMonth,
+
+    day:
       currentDay
-    );
+
+  };
 
 
   const previous =
@@ -987,129 +1189,50 @@ async function processAuto(
     );
 
 
-  const previousDate =
-    makeDateString(
-      previous.year,
-      previous.month,
-      previous.day
-    );
-
-
-  const f1 = [];
-  const f2 = [];
-  const f3 = [];
-
-
-  for (
-    const article of articles
-  ) {
-
-    const india =
-      getArticleIST(article);
-
-
-    if (!india) {
-
-      continue;
-
-    }
-
-
-    const articleDate =
-      makeDateString(
-        india.year,
-        india.month,
-        india.day
-      );
-
-
-    const articleBatch =
-      getArticleBatch(
-        article
-      );
-
-
-    if (!articleBatch) {
-
-      continue;
-
-    }
-
-
-    // Normal current-day articles
-    if (
-      articleDate === today
-    ) {
-
-      if (
-        articleBatch === "F1"
-      ) {
-
-        f1.push(article);
-
-      }
-
-      else if (
-        articleBatch === "F2"
-      ) {
-
-        f2.push(article);
-
-      }
-
-      else if (
-        articleBatch === "F3"
-      ) {
-
-        f3.push(article);
-
-      }
-
-    }
-
-
-    // ONLY F3 from previous day may be
-    // accepted after midnight.
-    else if (
-      articleDate === previousDate &&
-      articleBatch === "F3" &&
-      currentHour < 6
-    ) {
-
-      f3.push(article);
-
-    }
-
-  }
-
-
   console.log(
-    `📊 AUTO F1 matches: ${f1.length}`
-  );
-
-  console.log(
-    `📊 AUTO F2 matches: ${f2.length}`
-  );
-
-  console.log(
-    `📊 AUTO F3 matches: ${f3.length}`
+    "🤖 AUTO MODE: checking today's F1, F2 and F3 windows..."
   );
 
 
-  await saveArticles(
-    f1,
+  await processBatch(
+    apiKey,
+    today,
     "F1"
   );
 
-  await saveArticles(
-    f2,
+
+  await processBatch(
+    apiKey,
+    today,
     "F2"
   );
 
-  await saveArticles(
-    f3,
+
+  await processBatch(
+    apiKey,
+    today,
     "F3"
   );
+
+
+  // ONLY previous-day F3 is allowed after midnight.
+
+  if (
+    currentHour < 6
+  ) {
+
+    console.log(
+      "🌙 Before 6 AM IST: checking previous day's F3..."
+    );
+
+
+    await processBatch(
+      apiKey,
+      previous,
+      "F3"
+    );
+
+  }
 
 }
 
@@ -1119,7 +1242,7 @@ async function processAuto(
 // =====================================================
 
 async function processManual(
-  articles,
+  apiKey,
   batchName
 ) {
 
@@ -1136,29 +1259,29 @@ async function processManual(
   }
 
 
-  const batch =
-    BATCHES[batchName];
+  let target = {
 
-
-  const targetDate =
-    makeDateString(
+    year:
       currentYear,
+
+    month:
       currentMonth,
+
+    day:
       currentDay
-    );
+
+  };
 
 
-  let actualTargetDate =
-    targetDate;
+  // F3 after midnight belongs
+  // to previous calendar day.
 
-
-  // Delayed F3 after midnight
   if (
     batchName === "F3" &&
     currentHour < 6
   ) {
 
-    const previous =
+    target =
       getPreviousDate(
         currentYear,
         currentMonth,
@@ -1166,65 +1289,16 @@ async function processManual(
       );
 
 
-    actualTargetDate =
-      makeDateString(
-        previous.year,
-        previous.month,
-        previous.day
-      );
-
-
     console.log(
-      "⚠️ Manual F3 run after midnight."
+      "⚠️ Manual F3 after midnight: using previous day."
     );
 
   }
 
 
-  const matches =
-    articles.filter(
-      article => {
-
-        const india =
-          getArticleIST(
-            article
-          );
-
-
-        if (!india) {
-
-          return false;
-
-        }
-
-
-        const articleDate =
-          makeDateString(
-            india.year,
-            india.month,
-            india.day
-          );
-
-
-        return (
-          articleDate ===
-          actualTargetDate &&
-          getArticleBatch(
-            article
-          ) === batchName
-        );
-
-      }
-    );
-
-
-  console.log(
-    `📊 Manual ${batchName} matches: ${matches.length}`
-  );
-
-
-  await saveArticles(
-    matches,
+  await processBatch(
+    apiKey,
+    target,
     batchName
   );
 
@@ -1238,13 +1312,13 @@ async function processManual(
 async function fetchNews() {
 
   const apiKey =
-    process.env.NEWSDATA_API_KEY;
+    process.env.CURRENTS_API_KEY;
 
 
   if (!apiKey) {
 
     throw new Error(
-      "NEWSDATA_API_KEY secret is missing."
+      "CURRENTS_API_KEY secret is missing."
     );
 
   }
@@ -1283,24 +1357,9 @@ async function fetchNews() {
   );
 
 
-  // Always perform cleanup.
+  // Cleanup only automaticNews.
+
   await deleteOldNews();
-
-
-  console.log(
-    "📰 Fetching currently available NewsData articles..."
-  );
-
-
-  const articles =
-    await getAvailableArticles(
-      apiKey
-    );
-
-
-  console.log(
-    `📰 Total unique articles received: ${articles.length}`
-  );
 
 
   if (
@@ -1308,7 +1367,7 @@ async function fetchNews() {
   ) {
 
     await processAuto(
-      articles
+      apiKey
     );
 
   }
@@ -1316,7 +1375,7 @@ async function fetchNews() {
   else {
 
     await processManual(
-      articles,
+      apiKey,
       requestedBatch
     );
 
