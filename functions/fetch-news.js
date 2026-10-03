@@ -166,147 +166,45 @@ function makeUTCDate(
 // =====================================================
 
 function getArticleDate(article) {
-
   if (!article.published) {
     return null;
   }
 
-  let published =
-    article.published;
+  const date = new Date(article.published);
 
-  // Currents normally returns:
-  // 2026-10-03 05:20:00 +0000
-  //
-  // Convert it to:
-  // 2026-10-03T05:20:00+00:00
-
-  if (
-    typeof published === "string"
-  ) {
-
-    published =
-      published
-        .replace(
-          " ",
-          "T"
-        )
-        .replace(
-          /([+-]\d{2})(\d{2})$/,
-          "$1:$2"
-        );
-
-  }
-
-  const date =
-    new Date(published);
-
-  if (
-    isNaN(
-      date.getTime()
-    )
-  ) {
-
+  if (isNaN(date.getTime())) {
     return null;
-
   }
 
-  const parts =
-    new Intl.DateTimeFormat(
-      "en-IN",
-      {
-        timeZone: "Asia/Kolkata",
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-        hour12: false
-      }
-    ).formatToParts(date);
+  // Convert UTC timestamp to IST
+  const parts = new Intl.DateTimeFormat("en-IN", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    hour: "numeric",
+    minute: "numeric",
+    second: "numeric",
+    hour12: false
+  }).formatToParts(date);
 
-  function part(name) {
+  const result = {};
 
-    return Number(
-      parts.find(
-        p => p.type === name
-      )?.value
-    );
-
+  for (const part of parts) {
+    if (part.type !== "literal") {
+      result[part.type] = Number(part.value);
+    }
   }
 
   return {
-
-    year: part("year"),
-    month: part("month"),
-    day: part("day"),
-    hour: part("hour"),
-    minute: part("minute"),
-    second: part("second"),
-
-    dateObject: date
-
+    year: result.year,
+    month: result.month,
+    day: result.day,
+    hour: result.hour,
+    minute: result.minute,
+    second: result.second
   };
-
 }
-
-
-// =====================================================
-// FIND ARTICLE BATCH
-// =====================================================
-
-function getArticleBatch(article) {
-
-  const india =
-    getArticleDate(article);
-
-  if (!india) {
-    return null;
-  }
-
-  const minutes =
-    india.hour * 60 +
-    india.minute;
-
-
-  // F1
-  if (
-    minutes >= 6 * 60 &&
-    minutes <= 10 * 60
-  ) {
-
-    return "F1";
-
-  }
-
-
-  // F2
-  if (
-    minutes >= 11 * 60 &&
-    minutes <=
-      (17 * 60 + 30)
-  ) {
-
-    return "F2";
-
-  }
-
-
-  // F3
-  if (
-    minutes >= 18 * 60 &&
-    minutes <= 22 * 60
-  ) {
-
-    return "F3";
-
-  }
-
-
-  return null;
-
-}
-
 
 // =====================================================
 // FIND NEWS CATEGORY
