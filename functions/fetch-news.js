@@ -647,6 +647,11 @@ async function getMatchingArticles(apiKey) {
       `Page ${pageNumber}: ${articles.length} article(s)`
     );
 
+     articles.forEach((article, index) => {
+  console.log(
+    `PAGE ${pageNumber} - ${index + 1}: ${article.pubDate} | ${article.title}`
+  );
+});
     for (const article of articles) {
 
       if (
