@@ -30,10 +30,41 @@ const breakingNewsText = document.getElementById("breakingNewsText");
    HELPERS
 ================================ */
 
-function formatDate(dateString) {
-  if (!dateString) return "";
-  const date = new Date(dateString);
-  if (isNaN(date.getTime())) return dateString;
+function parseArticleDate(article) {
+  if (!article) return 0;
+  
+  // Try publishedAt standard date string
+  if (article.publishedAt) {
+    const date = new Date(article.publishedAt);
+    if (!isNaN(date.getTime())) return date.getTime();
+  }
+
+  // Fallback to savedAt Firestore Timestamp or Date
+  if (article.savedAt) {
+    if (typeof article.savedAt.toMillis === "function") {
+      return article.savedAt.toMillis();
+    }
+    if (typeof article.savedAt.toDate === "function") {
+      return article.savedAt.toDate().getTime();
+    }
+    const date = new Date(article.savedAt);
+    if (!isNaN(date.getTime())) return date.getTime();
+  }
+
+  return 0;
+}
+
+function formatDate(dateStringOrTimestamp) {
+  if (!dateStringOrTimestamp) return "";
+
+  let date;
+  if (typeof dateStringOrTimestamp.toDate === "function") {
+    date = dateStringOrTimestamp.toDate();
+  } else {
+    date = new Date(dateStringOrTimestamp);
+  }
+
+  if (isNaN(date.getTime())) return String(dateStringOrTimestamp);
 
   return date.toLocaleDateString("en-IN", {
     day: "numeric",
@@ -166,7 +197,7 @@ function loadTrendingNews() {
 
   const trendingQuery = query(
     collection(db, "automaticNews"),
-    limit(10)
+    limit(20)
   );
 
   onSnapshot(
@@ -182,7 +213,22 @@ function loadTrendingNews() {
         ...doc.data()
       }));
 
-      trendingItems.sort((a, b) => (b.views || 0) - (a.views || 0));
+      // SORTING LOGIC:
+      // 1. Highest views first
+      // 2. If views are equal (e.g. 0 views), sort by newest published/saved date
+      trendingItems.sort((a, b) => {
+        const viewsA = a.views || 0;
+        const viewsB = b.views || 0;
+
+        if (viewsB !== viewsA) {
+          return viewsB - viewsA;
+        }
+
+        const dateA = parseArticleDate(a);
+        const dateB = parseArticleDate(b);
+        return dateB - dateA;
+      });
+
       trendingItems = trendingItems.slice(0, 4);
 
       trendingGrid.innerHTML = trendingItems
@@ -279,8 +325,8 @@ function loadHomeNews() {
       }));
 
       newsItems.sort((a, b) => {
-        const dateA = new Date(a.publishedAt || a.savedAt || 0);
-        const dateB = new Date(b.publishedAt || b.savedAt || 0);
+        const dateA = parseArticleDate(a);
+        const dateB = parseArticleDate(b);
         return dateB - dateA;
       });
 
