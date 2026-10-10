@@ -5,6 +5,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <title>DAILY NEWS UPDATESS</title>
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8232375659484714"
+     crossorigin="anonymous"></script>
+<!-- Homepage Top Banner -->
+<ins class="adsbygoogle"
+     style="display:block"
+     data-ad-client="ca-pub-8232375659484714"
+     data-ad-slot="2460021613"
+     data-ad-format="auto"
+     data-full-width-responsive="true"></ins>
+<script>
+     (adsbygoogle = window.adsbygoogle || []).push({});
+</script>
+<link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#e11d48">
     <meta
     name="description"
     content="Daily News Updates — Get the latest Tamil Nadu, India, World, Politics, Sports, Technology, Education and Business news."
@@ -290,6 +305,7 @@
 
     <p>Your daily source for Tamil Nadu news and updates.</p>
 
+    <!-- 2. Mandatory Policy Links -->
     <div class="footer-links" style="margin: 15px 0; display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
         <a href="privacy.html" style="color: #6b7280; text-decoration: none;">Privacy Policy</a>
         <a href="terms.html" style="color: #6b7280; text-decoration: none;">Terms of Service</a>
@@ -346,6 +362,18 @@
     });
   }
 </script>
+<!-- 3. PWA Service Worker Registration -->
+    <script>
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker.register("sw.js")
+            .then(reg => console.log("PWA Service Worker registered!", reg.scope))
+            .catch(err => console.warn("Service Worker registration failed:", err));
+        });
+      }
+    </script>
+</body>
+</html>
 </body>
 </html>
 ```
