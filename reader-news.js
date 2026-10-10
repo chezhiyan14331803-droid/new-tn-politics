@@ -10,700 +10,233 @@ import {
 
 import { db } from "./firebase-config.js";
 
+/* =========================================
+   ELEMENT SELECTORS
+========================================= */
+const readerTitle = document.getElementById("readerTitle");
+const readerDate = document.getElementById("readerDate");
+const readerPdf = document.getElementById("readerPdf");
+const readerDownload = document.getElementById("readerDownload");
+const readerHeading = document.querySelector(".reader-heading");
 
 /* =========================================
-   ELEMENTS
+   UTILITY FUNCTIONS
 ========================================= */
-
-const readerTitle =
-  document.getElementById("readerTitle");
-
-const readerDate =
-  document.getElementById("readerDate");
-
-const readerSource =
-  document.getElementById("readerSource");
-
-const readerCategory =
-  document.getElementById("readerCategory");
-
-const readerDescription =
-  document.getElementById("readerDescription");
-
-const readerPdf =
-  document.getElementById("readerPdf");
-
-const readerDownload =
-  document.getElementById("readerDownload");
-
-const readerImage =
-  document.getElementById("readerImage");
-
-const readerImageContainer =
-  document.getElementById(
-    "readerImageContainer"
-  );
-
-const readerStatus =
-  document.getElementById("readerStatus");
-
-const pdfContainer =
-  document.querySelector(
-    ".pdf-container"
-  );
-
-
-/* =========================================
-   FORMAT DATE
-========================================= */
-
 function formatDate(dateString) {
-
-  if (!dateString) {
-    return "";
-  }
-
-  const date =
-    new Date(dateString);
-
-  if (isNaN(date.getTime())) {
-    return dateString;
-  }
-
-  return date.toLocaleDateString(
-    "en-IN",
-    {
-      day: "numeric",
-      month: "long",
-      year: "numeric"
-    }
-  );
+  if (!dateString) return "";
+  const date = new Date(dateString);
+  if (isNaN(date)) return dateString;
+  return date.toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "long",
+    year: "numeric"
+  });
 }
-
-
-/* =========================================
-   CATEGORY FORMAT
-========================================= */
-
-function formatCategory(category) {
-
-  if (!category) {
-    return "News";
-  }
-
-  return category
-    .split("-")
-    .map(word => {
-
-      return (
-        word.charAt(0).toUpperCase() +
-        word.slice(1)
-      );
-
-    })
-    .join(" ");
-}
-
-
-/* =========================================
-   GOOGLE DRIVE PDF PREVIEW
-========================================= */
 
 function getGoogleDrivePreviewUrl(url) {
-
-  if (!url) {
-    return "";
-  }
-
+  if (!url) return "";
   const match =
-    url.match(
-      /\/d\/([a-zA-Z0-9_-]+)/
-    ) ||
-    url.match(
-      /[?&]id=([a-zA-Z0-9_-]+)/
-    );
+    url.match(/\/d\/([a-zA-Z0-9_-]+)/) ||
+    url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
 
-  if (!match) {
-    return url;
-  }
-
-  return (
-    `https://drive.google.com/file/d/` +
-    `${match[1]}/preview`
-  );
+  if (!match) return url;
+  return `https://drive.google.com/file/d/${match[1]}/preview`;
 }
 
+/* =========================================
+   WHATSAPP & WEB SHARE INTEGRATION
+========================================= */
+function setupSharing(title, description) {
+  const whatsappBtn = document.getElementById("whatsappShareBtn");
+  const nativeBtn = document.getElementById("nativeShareBtn");
+
+  const currentUrl = window.location.href;
+  const shareText = `*${title}*\n\n${description ? description.slice(0, 100) + '...' : ''}\n\nRead more on New TN Politics: ${currentUrl}`;
+
+  if (whatsappBtn) {
+    whatsappBtn.onclick = () => {
+      const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`;
+      window.open(whatsappUrl, "_blank");
+    };
+  }
+
+  if (nativeBtn) {
+    nativeBtn.onclick = async () => {
+      if (navigator.share) {
+        try {
+          await navigator.share({
+            title: title,
+            text: description,
+            url: currentUrl
+          });
+        } catch (err) {
+          console.warn("Share cancelled or failed:", err);
+        }
+      } else {
+        navigator.clipboard.writeText(currentUrl);
+        alert("Article link copied to clipboard!");
+      }
+    };
+  }
+}
 
 /* =========================================
-   RESET READER
+   TEXT-TO-SPEECH (AUDIO READER)
 ========================================= */
+let speechInstance = null;
 
-function resetReader() {
+function setupAudioReader(title, description) {
+  const audioBtn = document.getElementById("audioNewsBtn");
+  if (!audioBtn) return;
 
-  if (readerImageContainer) {
-    readerImageContainer.style.display =
-      "none";
+  if (!("speechSynthesis" in window)) {
+    audioBtn.style.display = "none";
+    return;
   }
 
-  if (readerImage) {
-    readerImage.src = "";
+  audioBtn.onclick = () => {
+    if (window.speechSynthesis.speaking) {
+      window.speechSynthesis.cancel();
+      audioBtn.textContent = "🔊 Listen to News";
+      audioBtn.classList.remove("speaking");
+      return;
+    }
+
+    const textToRead = `${title}. ${description || ''}`;
+    speechInstance = new SpeechSynthesisUtterance(textToRead);
+    speechInstance.lang = "en-IN";
+    speechInstance.rate = 0.95;
+
+    speechInstance.onend = () => {
+      audioBtn.textContent = "🔊 Listen to News";
+      audioBtn.classList.remove("speaking");
+    };
+
+    speechInstance.onerror = () => {
+      audioBtn.textContent = "🔊 Listen to News";
+      audioBtn.classList.remove("speaking");
+    };
+
+    window.speechSynthesis.speak(speechInstance);
+    audioBtn.textContent = "⏹ Stop Listening";
+    audioBtn.classList.add("speaking");
+  };
+}
+
+/* =========================================
+   AUTOMATIC NEWS LOADER
+========================================= */
+async function loadAutomaticNews(newsId) {
+  const newsDocument = await getDoc(doc(db, "automaticNews", newsId));
+
+  if (!newsDocument.exists()) {
+    throw new Error("Automatic news item not found");
   }
 
-  if (pdfContainer) {
-    pdfContainer.style.display =
-      "none";
-  }
+  const news = newsDocument.data();
 
-  if (readerPdf) {
-    readerPdf.src = "";
-    readerPdf.style.display =
-      "none";
+  if (readerTitle) readerTitle.textContent = news.title || "Latest News";
+  if (readerDate) readerDate.textContent = formatDate(news.publishedAt || news.savedAt);
+
+  if (readerPdf && readerPdf.parentElement) {
+    readerPdf.parentElement.style.display = "none";
   }
 
   if (readerDownload) {
-    readerDownload.href = "#";
-    readerDownload.style.display =
-      "none";
+    readerDownload.textContent = "↗ Open Original Source";
+    readerDownload.href = news.sourceUrl || "#";
+    readerDownload.target = "_blank";
+    readerDownload.style.display = news.sourceUrl ? "inline-flex" : "none";
   }
 
-  if (readerSource) {
-    readerSource.textContent = "";
+  let description = document.getElementById("readerDescription");
+  if (!description && readerHeading) {
+    description = document.createElement("div");
+    description.id = "readerDescription";
+    description.className = "reader-description";
+    readerHeading.appendChild(description);
+  }
+  if (description) {
+    description.textContent = news.description || "Read the latest update from New TN Politics.";
   }
 
-  if (readerDescription) {
-    readerDescription.textContent =
-      "";
-  }
-
-  if (readerStatus) {
-    readerStatus.textContent =
-      "";
-  }
+  setupSharing(news.title || "Latest News", news.description || "");
+  setupAudioReader(news.title || "Latest News", news.description || "");
 }
 
-
 /* =========================================
-   AUTOMATIC NEWS
+   PDF NEWS LOADER
 ========================================= */
+async function loadPdfNews(newsId) {
+  let news;
 
-async function loadAutomaticNews(
-  newsId
-) {
-
-  const newsDocument =
-    await getDoc(
-      doc(
-        db,
-        "automaticNews",
-        newsId
+  if (newsId) {
+    const newsDocument = await getDoc(doc(db, "news", newsId));
+    if (!newsDocument.exists()) {
+      throw new Error("PDF News not found");
+    }
+    news = newsDocument.data();
+  } else {
+    const latestNews = await getDocs(
+      query(
+        collection(db, "news"),
+        orderBy("publicationDate", "desc"),
+        limit(1)
       )
     );
 
-
-  if (!newsDocument.exists()) {
-
-    throw new Error(
-      "Automatic news not found"
-    );
-
+    if (latestNews.empty) {
+      throw new Error("No PDF news published yet");
+    }
+    news = latestNews.docs[0].data();
   }
 
-
-  const news =
-    newsDocument.data();
-
-
-  console.log(
-    "Automatic news loaded:",
-    news
-  );
-
-
-  /* =====================================
-     TITLE
-  ===================================== */
-
-  readerTitle.textContent =
-    news.title ||
-    "Latest News";
-
-
-  /* =====================================
-     DATE
-  ===================================== */
-
-  readerDate.textContent =
-    news.publishedAt
-      ? formatDate(
-          news.publishedAt
-        )
-      : "Date unavailable";
-
-
-  /* =====================================
-     SOURCE
-  ===================================== */
-
-  if (readerSource) {
-
-    readerSource.textContent =
-      news.source
-        ? `Source: ${news.source}`
-        : "";
-
-  }
-
-
-  /* =====================================
-     CATEGORY
-  ===================================== */
-
-  if (readerCategory) {
-
-    readerCategory.textContent =
-      formatCategory(
-        news.category
-      );
-
-  }
-
-
-  /* =====================================
-     IMAGE
-  ===================================== */
-
-  if (
-    news.imageUrl &&
-    readerImage &&
-    readerImageContainer
-  ) {
-
-    readerImage.src =
-      news.imageUrl;
-
-    readerImage.alt =
-      news.title ||
-      "News image";
-
-    readerImageContainer.style.display =
-      "block";
-
-  }
-
-
-  /* =====================================
-     DESCRIPTION
-  ===================================== */
-
-  if (readerDescription) {
-
-    const description =
-      news.description ||
-      news.content ||
-      news.summary ||
-      "";
-
-    readerDescription.textContent =
-      description.trim() ||
-      "No description available for this news.";
-
-  }
-
-
-  /* =====================================
-     HIDE PDF
-  ===================================== */
-
-  if (pdfContainer) {
-
-    pdfContainer.style.display =
-      "none";
-
-  }
+  if (readerTitle) readerTitle.textContent = news.title || "Daily News PDF";
+  if (readerDate) readerDate.textContent = formatDate(news.publicationDate);
 
   if (readerPdf) {
-
-    readerPdf.style.display =
-      "none";
-
-    readerPdf.src = "";
-
+    if (readerPdf.parentElement) readerPdf.parentElement.style.display = "block";
+    readerPdf.style.display = "block";
+    readerPdf.src = getGoogleDrivePreviewUrl(news.pdfUrl);
   }
 
-
-  /* =====================================
-     ORIGINAL NEWS BUTTON
-  ===================================== */
-
-  if (
-    news.sourceUrl &&
-    readerDownload
-  ) {
-
-    readerDownload.href =
-      news.sourceUrl;
-
-    readerDownload.textContent =
-      "↗ Open Original News";
-
-    readerDownload.target =
-      "_blank";
-
-    readerDownload.rel =
-      "noopener noreferrer";
-
-    readerDownload.style.display =
-      "inline-flex";
-
+  if (readerDownload) {
+    readerDownload.textContent = "↓ Download PDF";
+    readerDownload.href = news.pdfUrl || "#";
+    readerDownload.target = "_blank";
+    readerDownload.style.display = news.pdfUrl ? "inline-flex" : "none";
   }
 
-
-  /* =====================================
-     STATUS
-  ===================================== */
-
-  if (readerStatus) {
-
-    readerStatus.textContent =
-      "You are reading an automatic news update.";
-
-  }
-
+  setupSharing(news.title || "Daily News PDF", news.description || "");
+  setupAudioReader(news.title || "Daily News PDF", news.description || "");
 }
 
-
 /* =========================================
-   PDF NEWS
+   MAIN ROUTER
 ========================================= */
-
-async function loadPdfNews(
-  newsId
-) {
-
-  let news;
-
-
-  /* =====================================
-     LOAD SPECIFIC PDF
-  ===================================== */
-
-  if (newsId) {
-
-    const newsDocument =
-      await getDoc(
-        doc(
-          db,
-          "news",
-          newsId
-        )
-      );
-
-
-    if (!newsDocument.exists()) {
-
-      throw new Error(
-        "News not found"
-      );
-
-    }
-
-
-    news =
-      newsDocument.data();
-
-  }
-
-
-  /* =====================================
-     LOAD LATEST PDF
-  ===================================== */
-
-  else {
-
-    const latestNews =
-      await getDocs(
-        query(
-          collection(db, "news"),
-          orderBy(
-            "publicationDate",
-            "desc"
-          ),
-          limit(1)
-        )
-      );
-
-
-    if (latestNews.empty) {
-
-      throw new Error(
-        "No news published yet"
-      );
-
-    }
-
-
-    news =
-      latestNews.docs[0].data();
-
-  }
-
-
-  /* =====================================
-     TITLE
-  ===================================== */
-
-  readerTitle.textContent =
-    news.title ||
-    "Latest News";
-
-
-  /* =====================================
-     DATE
-  ===================================== */
-
-  readerDate.textContent =
-    formatDate(
-      news.publicationDate
-    );
-
-
-  /* =====================================
-     SOURCE
-  ===================================== */
-
-  if (readerSource) {
-
-    readerSource.textContent =
-      "Published News";
-
-  }
-
-
-  /* =====================================
-     CATEGORY
-  ===================================== */
-
-  if (readerCategory) {
-
-    readerCategory.textContent =
-      "Daily News";
-
-  }
-
-
-  /* =====================================
-     DESCRIPTION
-  ===================================== */
-
-  if (readerDescription) {
-
-    readerDescription.textContent =
-      "Read the published news document below.";
-
-  }
-
-
-  /* =====================================
-     HIDE IMAGE
-  ===================================== */
-
-  if (readerImageContainer) {
-
-    readerImageContainer.style.display =
-      "none";
-
-  }
-
-
-  /* =====================================
-     PDF
-  ===================================== */
-
-  if (
-    news.pdfUrl &&
-    readerPdf &&
-    pdfContainer
-  ) {
-
-    readerPdf.src =
-      getGoogleDrivePreviewUrl(
-        news.pdfUrl
-      );
-
-    readerPdf.style.display =
-      "block";
-
-    pdfContainer.style.display =
-      "block";
-
-  }
-
-
-  /* =====================================
-     DOWNLOAD
-  ===================================== */
-
-  if (
-    news.pdfUrl &&
-    readerDownload
-  ) {
-
-    readerDownload.href =
-      news.pdfUrl;
-
-    readerDownload.textContent =
-      "↓ Download PDF";
-
-    readerDownload.target =
-      "_blank";
-
-    readerDownload.rel =
-      "noopener noreferrer";
-
-    readerDownload.style.display =
-      "inline-flex";
-
-  }
-
-
-  /* =====================================
-     STATUS
-  ===================================== */
-
-  if (readerStatus) {
-
-    readerStatus.textContent =
-      "Published PDF news";
-
-  }
-
-}
-
-
-/* =========================================
-   MAIN
-========================================= */
-
 async function loadNews() {
-
   try {
+    const urlParams = new URLSearchParams(window.location.search);
+    const newsId = urlParams.get("id");
+    const newsType = urlParams.get("type");
 
-    resetReader();
-
-
-    const params =
-      new URLSearchParams(
-        window.location.search
-      );
-
-
-    const newsId =
-      params.get("id");
-
-
-    const type =
-      params.get("type");
-
-
-    /* =====================================
-       AUTOMATIC NEWS
-    ===================================== */
-
-    if (
-      type === "automatic" &&
-      newsId
-    ) {
-
-      await loadAutomaticNews(
-        newsId
-      );
-
+    if (newsType === "automatic" && newsId) {
+      await loadAutomaticNews(newsId);
+    } else {
+      await loadPdfNews(newsId);
     }
-
-
-    /* =====================================
-       PDF NEWS
-    ===================================== */
-
-    else {
-
-      await loadPdfNews(
-        newsId
-      );
-
-    }
-
-
   } catch (error) {
+    console.error("Reader Error:", error);
+    if (readerTitle) readerTitle.textContent = "News article is unavailable";
+    if (readerDate) readerDate.textContent = "Please return to the homepage or try again later.";
 
-    console.error(
-      "Reader error:",
-      error
-    );
-
-
-    readerTitle.textContent =
-      "News is not available";
-
-
-    readerDate.textContent =
-      "Please return later.";
-
-
-    if (readerCategory) {
-
-      readerCategory.textContent =
-        "Error";
-
+    if (readerPdf && readerPdf.parentElement) {
+      readerPdf.parentElement.style.display = "none";
     }
-
-
-    if (readerDescription) {
-
-      readerDescription.textContent =
-        "We could not load this news article. Please return to the homepage and try again.";
-
-    }
-
-
-    if (readerPdf) {
-
-      readerPdf.style.display =
-        "none";
-
-    }
-
-
-    if (pdfContainer) {
-
-      pdfContainer.style.display =
-        "none";
-
-    }
-
-
     if (readerDownload) {
-
-      readerDownload.style.display =
-        "none";
-
+      readerDownload.style.display = "none";
     }
-
-
-    if (readerStatus) {
-
-      readerStatus.textContent =
-        "Something went wrong while loading the news.";
-
-    }
-
   }
-
 }
-
-
-/* =========================================
-   START
-========================================= */
 
 loadNews();
