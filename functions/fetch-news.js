@@ -14,11 +14,35 @@ const serviceAccount = JSON.parse(
   process.env.FIREBASE_SERVICE_ACCOUNT
 );
 
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount)
-});
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount)
+  });
+}
 
 const db = admin.firestore();
+
+// =====================================================
+// DISTRICT DETECTION HELPERS
+// =====================================================
+
+const DISTRICTS = [
+  "Chennai", "Coimbatore", "Madurai", "Salem", "Trichy", "Tiruchirappalli",
+  "Tiruppur", "Erode", "Tirunelveli", "Vellore", "Thanjavur", "Dindigul",
+  "Kanchipuram", "Cuddalore", "Karur", "Nagercoil", "Kanyakumari", "Tuticorin",
+  "Thoothukudi", "Villupuram", "Dharmapuri", "Krishnagiri", "Namakkal",
+  "Sivaganga", "Virudhunagar", "Ramanathapuram"
+];
+
+function detectDistrict(title, description) {
+  const text = `${title || ""} ${description || ""}`.toLowerCase();
+  for (const district of DISTRICTS) {
+    if (text.includes(district.toLowerCase())) {
+      return district === "Tiruchirappalli" ? "Trichy" : district;
+    }
+  }
+  return "General";
+}
 
 // =====================================================
 // CURRENT IST TIME
@@ -120,7 +144,6 @@ function makeUTCDate(
   minute,
   second = 0
 ) {
-  // IST = UTC + 5:30
   return new Date(
     Date.UTC(
       year,
@@ -192,7 +215,6 @@ function getCategory(article) {
     }
   `.toLowerCase();
 
-  // POLITICS
   if (
     text.includes("politic") ||
     text.includes("election") ||
@@ -212,7 +234,6 @@ function getCategory(article) {
     return "Politics";
   }
 
-  // SPORTS
   if (
     text.includes("cricket") ||
     text.includes("football") ||
@@ -227,7 +248,6 @@ function getCategory(article) {
     return "Sports";
   }
 
-  // TECHNOLOGY
   if (
     text.includes("technology") ||
     text.includes("tech") ||
@@ -243,7 +263,6 @@ function getCategory(article) {
     return "Technology";
   }
 
-  // BUSINESS
   if (
     text.includes("business") ||
     text.includes("economy") ||
@@ -259,7 +278,6 @@ function getCategory(article) {
     return "Business";
   }
 
-  // EDUCATION
   if (
     text.includes("education") ||
     text.includes("school") ||
@@ -274,7 +292,6 @@ function getCategory(article) {
     return "Education";
   }
 
-  // TAMIL NADU
   if (
     text.includes("tamil nadu") ||
     text.includes("tamilnadu") ||
@@ -302,7 +319,6 @@ function getCategory(article) {
     return "Tamil Nadu";
   }
 
-  // INDIA
   if (
     text.includes("india") ||
     text.includes("delhi") ||
@@ -317,7 +333,6 @@ function getCategory(article) {
     return "India";
   }
 
-  // WORLD
   if (
     text.includes("usa") ||
     text.includes("united states") ||
@@ -374,19 +389,12 @@ async function deleteOldNews() {
   );
 
   const cutoffDate = new Date();
+  cutoffDate.setDate(cutoffDate.getDate() - 20);
 
-  cutoffDate.setDate(
-    cutoffDate.getDate() - 20
-  );
-
-  const snapshot = await db
-    .collection("automaticNews")
-    .get();
+  const snapshot = await db.collection("automaticNews").get();
 
   if (snapshot.empty) {
-    console.log(
-      "✅ No automatic news found."
-    );
+    console.log("✅ No automatic news found.");
     return;
   }
 
@@ -394,61 +402,36 @@ async function deleteOldNews() {
 
   for (const doc of snapshot.docs) {
     const data = doc.data();
-
     let savedDate = null;
 
     if (data.savedAt) {
-      if (
-        typeof data.savedAt.toDate === "function"
-      ) {
+      if (typeof data.savedAt.toDate === "function") {
         savedDate = data.savedAt.toDate();
-      } else if (
-        data.savedAt instanceof Date
-      ) {
+      } else if (data.savedAt instanceof Date) {
         savedDate = data.savedAt;
       }
     }
 
-    if (
-      !savedDate &&
-      data.publishedAt
-    ) {
-      const publishedDate =
-        new Date(data.publishedAt);
-
-      if (
-        !isNaN(publishedDate.getTime())
-      ) {
+    if (!savedDate && data.publishedAt) {
+      const publishedDate = new Date(data.publishedAt);
+      if (!isNaN(publishedDate.getTime())) {
         savedDate = publishedDate;
       }
     }
 
-    if (
-      savedDate &&
-      savedDate < cutoffDate
-    ) {
+    if (savedDate && savedDate < cutoffDate) {
       docsToDelete.push(doc);
     }
   }
 
   if (docsToDelete.length === 0) {
-    console.log(
-      "✅ No automatic news older than 20 days found."
-    );
+    console.log("✅ No automatic news older than 20 days found.");
     return;
   }
 
-  for (
-    let i = 0;
-    i < docsToDelete.length;
-    i += 500
-  ) {
+  for (let i = 0; i < docsToDelete.length; i += 500) {
     const batch = db.batch();
-
-    const chunk = docsToDelete.slice(
-      i,
-      i + 500
-    );
+    const chunk = docsToDelete.slice(i, i + 500);
 
     chunk.forEach(doc => {
       batch.delete(doc.ref);
@@ -466,32 +449,19 @@ async function deleteOldNews() {
 // FETCH CURRENTS SEARCH
 // =====================================================
 
-async function fetchCurrents(
-  apiKey,
-  startDate,
-  endDate
-) {
+async function fetchCurrents(apiKey, startDate, endDate) {
   const params = new URLSearchParams({
-    keywords:
-      "\"Tamil Nadu\" OR Chennai OR Coimbatore OR Madurai OR Salem OR Tiruppur OR Trichy OR Tamilnadu",
-
+    keywords: "\"Tamil Nadu\" OR Chennai OR Coimbatore OR Madurai OR Salem OR Tiruppur OR Trichy OR Tamilnadu",
     country: "IN",
-
     language: "en",
-
     start_date: startDate,
-
     end_date: endDate,
-
     page_number: "1",
-
     page_size: "20",
-
     apiKey: apiKey
   });
 
-  const url =
-    `https://api.currentsapi.services/v1/search?${params.toString()}`;
+  const url = `https://api.currentsapi.services/v1/search?${params.toString()}`;
 
   const response = await fetch(url, {
     headers: {
@@ -509,59 +479,41 @@ async function fetchCurrents(
 
   if (data.status === "error") {
     throw new Error(
-      data.message ||
-      data.msg ||
-      "Currents API returned an error."
+      data.message || data.msg || "Currents API returned an error."
     );
   }
 
-  return Array.isArray(data.news)
-    ? data.news
-    : [];
+  return Array.isArray(data.news) ? data.news : [];
 }
 
-// =====================================================
-// GET ARTICLES FOR ONE TIME WINDOW
-// =====================================================
 // =====================================================
 // FETCH FULL ARTICLE DESCRIPTION
 // =====================================================
 
 async function fetchFullArticleDescription(url) {
-  if (!url) {
-    return "";
-  }
+  if (!url) return "";
 
   try {
     const response = await fetch(url, {
       headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36",
-        "Accept":
-          "text/html,application/xhtml+xml"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml"
       },
       redirect: "follow"
     });
 
     if (!response.ok) {
-      console.log(
-        `⚠️ Article page returned ${response.status}: ${url}`
-      );
+      console.log(`⚠️ Article page returned ${response.status}: ${url}`);
       return "";
     }
 
     const html = await response.text();
-
     const $ = cheerio.load(html);
 
-    // Remove elements that are not article content
-    $(
-      "script, style, noscript, iframe, nav, header, footer, aside, form"
-    ).remove();
+    $("script, style, noscript, iframe, nav, header, footer, aside, form").remove();
 
     let paragraphs = [];
 
-    // First try common article containers
     const selectors = [
       "article p",
       "[itemprop='articleBody'] p",
@@ -576,13 +528,8 @@ async function fetchFullArticleDescription(url) {
 
     for (const selector of selectors) {
       const found = [];
-
       $(selector).each((index, element) => {
-        const text = $(element)
-          .text()
-          .replace(/\s+/g, " ")
-          .trim();
-
+        const text = $(element).text().replace(/\s+/g, " ").trim();
         if (text.length >= 40) {
           found.push(text);
         }
@@ -594,104 +541,54 @@ async function fetchFullArticleDescription(url) {
       }
     }
 
-    // Fallback: collect useful paragraphs from the page
     if (paragraphs.length === 0) {
       $("p").each((index, element) => {
-        const text = $(element)
-          .text()
-          .replace(/\s+/g, " ")
-          .trim();
-
+        const text = $(element).text().replace(/\s+/g, " ").trim();
         if (text.length >= 40) {
           paragraphs.push(text);
         }
       });
     }
 
-    if (paragraphs.length === 0) {
-      return "";
-    }
+    if (paragraphs.length === 0) return "";
 
-    // Remove duplicate paragraphs
     paragraphs = [...new Set(paragraphs)];
-
-    // Keep the first useful article paragraphs.
-    // This prevents menus, comments and unrelated page text
-    // from becoming the news description.
-    const description = paragraphs
-      .slice(0, 8)
-      .join(" ")
-      .trim();
-
-    // Limit extremely long pages
+    const description = paragraphs.slice(0, 8).join(" ").trim();
     return description.slice(0, 5000);
 
   } catch (error) {
-    console.log(
-      `⚠️ Could not fetch article content: ${url}`
-    );
-
+    console.log(`⚠️ Could not fetch article content: ${url}`);
     return "";
   }
 }
-async function getArticlesForWindow(
-  apiKey,
-  dateInfo,
-  batchName
-) {
+
+// =====================================================
+// GET ARTICLES FOR ONE TIME WINDOW
+// =====================================================
+
+async function getArticlesForWindow(apiKey, dateInfo, batchName) {
   const batch = BATCHES[batchName];
 
   if (!batch) {
-    throw new Error(
-      `Unknown batch: ${batchName}`
-    );
+    throw new Error(`Unknown batch: ${batchName}`);
   }
 
   const startDate = makeUTCDate(
-    dateInfo.year,
-    dateInfo.month,
-    dateInfo.day,
-    batch.startHour,
-    batch.startMinute,
-    0
+    dateInfo.year, dateInfo.month, dateInfo.day,
+    batch.startHour, batch.startMinute, 0
   );
 
-  // One minute after the end boundary
   const endDate = makeUTCDate(
-    dateInfo.year,
-    dateInfo.month,
-    dateInfo.day,
-    batch.endHour,
-    batch.endMinute + 1,
-    0
+    dateInfo.year, dateInfo.month, dateInfo.day,
+    batch.endHour, batch.endMinute + 1, 0
   );
 
-  console.log(
-    `🔎 Searching Currents for ${batchName}`
-  );
+  console.log(`🔎 Searching Currents for ${batchName}`);
+  console.log(`   IST window: ${makeDateString(dateInfo.year, dateInfo.month, dateInfo.day)} ${String(batch.startHour).padStart(2, "0")}:${String(batch.startMinute).padStart(2, "0")} → ${String(batch.endHour).padStart(2, "0")}:${String(batch.endMinute).padStart(2, "0")}`);
+  console.log(`   UTC search: ${startDate} → ${endDate}`);
 
-  console.log(
-    `   IST window: ${makeDateString(
-      dateInfo.year,
-      dateInfo.month,
-      dateInfo.day
-    )} ${String(batch.startHour).padStart(2, "0")}:${String(batch.startMinute).padStart(2, "0")} - ${String(batch.endHour).padStart(2, "0")}:${String(batch.endMinute).padStart(2, "0")}`
-  );
-
-  console.log(
-    `   UTC search: ${startDate} → ${endDate}`
-  );
-
-  const articles = await fetchCurrents(
-    apiKey,
-    startDate,
-    endDate
-  );
-
-  console.log(
-    `   Currents returned: ${articles.length}`
-  );
-
+  const articles = await fetchCurrents(apiKey, startDate, endDate);
+  console.log(`   Currents returned: ${articles.length}`);
   return articles;
 }
 
@@ -699,79 +596,30 @@ async function getArticlesForWindow(
 // EXACT ARTICLE MATCH
 // =====================================================
 
-function articleMatches(
-  article,
-  targetDate,
-  batchName
-) {
+function articleMatches(article, targetDate, batchName) {
   const india = getArticleDate(article);
+  if (!india) return false;
 
-  if (!india) {
-    return false;
-  }
+  const articleDate = makeDateString(india.year, india.month, india.day);
+  if (articleDate !== targetDate) return false;
 
-  // -----------------------------------------------
-  // 1. Check calendar date in IST
-  // -----------------------------------------------
-
-  const articleDate = makeDateString(
-    india.year,
-    india.month,
-    india.day
-  );
-
-  if (articleDate !== targetDate) {
-    return false;
-  }
-
-  // -----------------------------------------------
-  // 2. Convert article time to minutes
-  // -----------------------------------------------
-
-  const articleMinutes =
-    india.hour * 60 + india.minute;
-
-  // -----------------------------------------------
-  // 3. Get selected batch
-  // -----------------------------------------------
-
+  const articleMinutes = india.hour * 60 + india.minute;
   const batch = BATCHES[batchName];
+  if (!batch) return false;
 
-  if (!batch) {
-    return false;
-  }
+  const startMinutes = batch.startHour * 60 + batch.startMinute;
+  const endMinutes = batch.endHour * 60 + batch.endMinute;
 
-  const startMinutes =
-    batch.startHour * 60 +
-    batch.startMinute;
-
-  const endMinutes =
-    batch.endHour * 60 +
-    batch.endMinute;
-
-  // -----------------------------------------------
-  // 4. Exact batch time
-  // -----------------------------------------------
-
-  return (
-    articleMinutes >= startMinutes &&
-    articleMinutes <= endMinutes
-  );
+  return articleMinutes >= startMinutes && articleMinutes <= endMinutes;
 }
 
 // =====================================================
 // SAVE ARTICLES
 // =====================================================
 
-async function saveArticles(
-  articles,
-  batchName
-) {
+async function saveArticles(articles, batchName) {
   if (articles.length === 0) {
-    console.log(
-      `ℹ️ No ${batchName} articles to save.`
-    );
-
+    console.log(`ℹ️ No ${batchName} articles to save.`);
     return 0;
   }
 
@@ -779,296 +627,123 @@ async function saveArticles(
   const seenIds = new Set();
 
   for (const article of articles) {
-    const id =
-      article.id ||
-      article.url ||
-      article.title;
-
-    if (!id) {
-      continue;
-    }
-
-    if (seenIds.has(id)) {
-      continue;
-    }
+    const id = article.id || article.url || article.title;
+    if (!id || seenIds.has(id)) continue;
 
     seenIds.add(id);
     uniqueArticles.push(article);
 
-    // Maximum 10 per fetch
-    if (uniqueArticles.length >= 10) {
-      break;
-    }
+    if (uniqueArticles.length >= 10) break;
   }
 
-  console.log(
-    `💾 Processing ${uniqueArticles.length} ${batchName} article(s)...`
-  );
+  console.log(`💾 Processing ${uniqueArticles.length} ${batchName} article(s)...`);
 
-  if (uniqueArticles.length === 0) {
-    return 0;
-  }
+  if (uniqueArticles.length === 0) return 0;
 
   const batch = db.batch();
-
   let saveCount = 0;
 
   for (const article of uniqueArticles) {
     const articleId = (
       article.id ||
-      Buffer.from(
-        article.url ||
-        article.title ||
-        Date.now().toString()
-      )
+      Buffer.from(article.url || article.title || Date.now().toString())
         .toString("base64")
-        .replace(
-          /[^a-zA-Z0-9]/g,
-          ""
-        )
+        .replace(/[^a-zA-Z0-9]/g, "")
         .slice(0, 50)
     );
 
-    const newsRef = db
-      .collection("automaticNews")
-      .doc(articleId);
-
-    const existingDoc =
-      await newsRef.get();
+    const newsRef = db.collection("automaticNews").doc(articleId);
+    const existingDoc = await newsRef.get();
 
     let savedAt;
+    let existingViews = 0;
 
-    if (
-      existingDoc.exists &&
-      existingDoc.data().savedAt
-    ) {
-      // Preserve original savedAt
-      savedAt =
-        existingDoc.data().savedAt;
+    if (existingDoc.exists) {
+      const data = existingDoc.data();
+      savedAt = data.savedAt;
+      existingViews = data.views || 0;
     } else {
-      // New article
-      savedAt =
-        admin.firestore.Timestamp.fromMillis(
-      Date.now() + saveCount);
+      savedAt = admin.firestore.Timestamp.fromMillis(Date.now() + saveCount);
     }
 
-    const category =
-  getCategory(article);
+    const category = getCategory(article);
+    const district = detectDistrict(article.title, article.description);
 
-console.log(
-  `📰 Fetching full article content: ${article.title}`
-);
+    console.log(`📰 Fetching full article content: ${article.title}`);
+    const fullDescription = await fetchFullArticleDescription(article.url);
+    const finalDescription = fullDescription || article.description || "";
 
-const fullDescription =
-  await fetchFullArticleDescription(
-    article.url
-  );
-
-const finalDescription =
-  fullDescription ||
-  article.description ||
-  "";
-
-console.log(
-  `✅ ${batchName}: ${article.title}`
-);
+    console.log(`✅ ${batchName}: ${article.title} [District: ${district}]`);
 
     batch.set(
       newsRef,
       {
-        title:
-          article.title ||
-          "Untitled",
-
-        description:
-          finalDescription,
-
-        source:
-          getSourceName(article),
-
-        sourceUrl:
-          article.url ||
-          "",
-
-        publishedAt:
-          article.published ||
-          "",
-
+        title: article.title || "Untitled",
+        description: finalDescription,
+        source: getSourceName(article),
+        sourceUrl: article.url || "",
+        publishedAt: article.published || "",
         savedAt,
-
         category,
-
-        imageUrl:
-          article.image ||
-          "",
-
-        updatedAt:
-          admin.firestore.FieldValue.serverTimestamp()
+        district,
+        views: existingViews,
+        imageUrl: article.image || "",
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
       },
-      {
-        merge: true
-      }
+      { merge: true }
     );
 
     saveCount++;
   }
 
   await batch.commit();
-
-  console.log(
-    `✅ ${saveCount} ${batchName} article(s) saved to automaticNews.`
-  );
-
+  console.log(`✅ ${saveCount} ${batchName} article(s) saved to automaticNews.`);
   return saveCount;
 }
 
 // =====================================================
-// PROCESS ONE BATCH
+// PROCESS BATCH & AUTO MODES
 // =====================================================
 
-async function processBatch(
-  apiKey,
-  dateInfo,
-  batchName
-) {
-  const targetDate =
-    makeDateString(
-      dateInfo.year,
-      dateInfo.month,
-      dateInfo.day
-    );
+async function processBatch(apiKey, dateInfo, batchName) {
+  const targetDate = makeDateString(dateInfo.year, dateInfo.month, dateInfo.day);
+  const articles = await getArticlesForWindow(apiKey, dateInfo, batchName);
+  const matches = articles.filter(article => articleMatches(article, targetDate, batchName));
 
-  const articles =
-    await getArticlesForWindow(
-      apiKey,
-      dateInfo,
-      batchName
-    );
-
-  const matches =
-    articles.filter(article =>
-      articleMatches(
-        article,
-        targetDate,
-        batchName
-      )
-    );
-
-  console.log(
-    `📊 ${batchName} exact matches: ${matches.length}`
-  );
-
-  return saveArticles(
-    matches,
-    batchName
-  );
+  console.log(`📊 ${batchName} exact matches: ${matches.length}`);
+  return saveArticles(matches, batchName);
 }
 
-// =====================================================
-// AUTO MODE
-// =====================================================
-
 async function processAuto(apiKey) {
-  const today = {
-    year: currentYear,
-    month: currentMonth,
-    day: currentDay
-  };
+  const today = { year: currentYear, month: currentMonth, day: currentDay };
+  const previous = getPreviousDate(currentYear, currentMonth, currentDay);
 
-  const previous =
-    getPreviousDate(
-      currentYear,
-      currentMonth,
-      currentDay
-    );
+  console.log("🤖 AUTO MODE: checking today's F1, F2 and F3 windows...");
 
-  console.log(
-    "🤖 AUTO MODE: checking today's F1, F2 and F3 windows..."
-  );
-
-  // Today's F1
-  await processBatch(
-    apiKey,
-    today,
-    "F1"
-  );
-
-  // Today's F2
-  await processBatch(
-    apiKey,
-    today,
-    "F2"
-  );
-
-  // Today's F3
-  await processBatch(
-    apiKey,
-    today,
-    "F3"
-  );
-
-  // ---------------------------------------------------
-  // ONLY previous-day F3 is allowed after midnight.
-  // ---------------------------------------------------
+  await processBatch(apiKey, today, "F1");
+  await processBatch(apiKey, today, "F2");
+  await processBatch(apiKey, today, "F3");
 
   if (currentHour < 6) {
-    console.log(
-      "🌙 Before 6 AM IST: checking previous day's F3..."
-    );
-
-    await processBatch(
-      apiKey,
-      previous,
-      "F3"
-    );
+    console.log("🌙 Before 6 AM IST: checking previous day's F3...");
+    await processBatch(apiKey, previous, "F3");
   }
 }
 
-// =====================================================
-// MANUAL MODE
-// =====================================================
-
-async function processManual(
-  apiKey,
-  batchName
-) {
+async function processManual(apiKey, batchName) {
   if (!BATCHES[batchName]) {
-    console.log(
-      "❌ Invalid manual batch."
-    );
-
+    console.log("❌ Invalid manual batch.");
     return;
   }
 
-  let target = {
-    year: currentYear,
-    month: currentMonth,
-    day: currentDay
-  };
+  let target = { year: currentYear, month: currentMonth, day: currentDay };
 
-  // F3 after midnight belongs to
-  // previous calendar day.
-  if (
-    batchName === "F3" &&
-    currentHour < 6
-  ) {
-    target =
-      getPreviousDate(
-        currentYear,
-        currentMonth,
-        currentDay
-      );
-
-    console.log(
-      "⚠️ Manual F3 after midnight: using previous day."
-    );
+  if (batchName === "F3" && currentHour < 6) {
+    target = getPreviousDate(currentYear, currentMonth, currentDay);
+    console.log("⚠️ Manual F3 after midnight: using previous day.");
   }
 
-  await processBatch(
-    apiKey,
-    target,
-    batchName
-  );
+  await processBatch(apiKey, target, batchName);
 }
 
 // =====================================================
@@ -1076,71 +751,31 @@ async function processManual(
 // =====================================================
 
 async function fetchNews() {
-  const apiKey =
-    process.env.CURRENTS_API_KEY;
+  const apiKey = process.env.CURRENTS_API_KEY;
 
   if (!apiKey) {
-    throw new Error(
-      "CURRENTS_API_KEY secret is missing."
-    );
+    throw new Error("CURRENTS_API_KEY secret is missing.");
   }
 
-  const requestedBatch =
-    process.env.NEWS_BATCH ||
-    "AUTO";
+  const requestedBatch = process.env.NEWS_BATCH || "AUTO";
 
-  console.log(
-    "================================="
-  );
+  console.log("=================================");
+  console.log("TARGET DATE:", makeDateString(currentYear, currentMonth, currentDay));
+  console.log("CURRENT IST:", `${String(currentHour).padStart(2, "0")}:${String(currentMinute).padStart(2, "0")}`);
+  console.log("NEWS BATCH:", requestedBatch);
+  console.log("=================================");
 
-  console.log(
-    "TARGET DATE:",
-    makeDateString(
-      currentYear,
-      currentMonth,
-      currentDay
-    )
-  );
-
-  console.log(
-    "CURRENT IST:",
-    `${String(currentHour).padStart(2, "0")}:${String(currentMinute).padStart(2, "0")}`
-  );
-
-  console.log(
-    "NEWS BATCH:",
-    requestedBatch
-  );
-
-  console.log(
-    "================================="
-  );
-
-  // Cleanup ONLY automaticNews
   await deleteOldNews();
 
-  if (
-    requestedBatch === "AUTO"
-  ) {
+  if (requestedBatch === "AUTO") {
     await processAuto(apiKey);
   } else {
-    await processManual(
-      apiKey,
-      requestedBatch
-    );
+    await processManual(apiKey, requestedBatch);
   }
 
-  console.log(
-    "================================="
-  );
-
-  console.log(
-    "✅ FETCH COMPLETED"
-  );
-
-  console.log(
-    "================================="
-  );
+  console.log("=================================");
+  console.log("✅ FETCH COMPLETED");
+  console.log("=================================");
 }
 
 // =====================================================
@@ -1148,10 +783,6 @@ async function fetchNews() {
 // =====================================================
 
 fetchNews().catch(error => {
-  console.error(
-    "❌ Fetch failed:",
-    error
-  );
-
+  console.error("❌ Fetch failed:", error);
   process.exit(1);
 });
