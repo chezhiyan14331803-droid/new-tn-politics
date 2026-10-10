@@ -2577,7 +2577,7 @@ body {
    ===================================================== */
 
 #archiveGrid .publication-item p:nth-of-type(3) {
-    font-size: 14px;
+    font-size: 16px;
 
     display: -webkit-box;
     -webkit-line-clamp: 4;

@@ -205,8 +205,18 @@ function displayNews(newsItems) {
 
   /* ---------- PREVIOUS NEWS ---------- */
 
-  const previousNews =
-    newsItems.slice(1);
+  const today = new Date().toLocaleDateString("en-IN");
+
+const previousNews = newsItems
+  .slice(1)
+  .filter(news => {
+    if (!news.publishedAt) return false;
+
+    const newsDate = new Date(news.publishedAt)
+      .toLocaleDateString("en-IN");
+
+    return newsDate === today;
+  });
 
 
   if (previousNews.length === 0) {
@@ -295,12 +305,7 @@ function setupCategoryButtons() {
 }
 
 
-/* ================================
-   LOAD HOMEPAGE NEWS
-================================ */
-
 function loadHomeNews() {
-
 
   /* ---------- CURRENT DATE ---------- */
 
@@ -325,8 +330,8 @@ function loadHomeNews() {
   const newsQuery =
     query(
       collection(db, "automaticNews"),
-      orderBy("publishedAt", "desc"),
-      limit(4)
+      orderBy("savedAt", "desc"),
+      limit(20)
     );
 
 
@@ -343,6 +348,8 @@ function loadHomeNews() {
       );
 
 
+      /* ---------- GET NEWS ---------- */
+
       const newsItems =
         snapshot.docs.map(doc => ({
 
@@ -352,6 +359,7 @@ function loadHomeNews() {
 
         }));
 
+      /* ---------- DISPLAY ---------- */
 
       displayNews(newsItems);
 
@@ -385,7 +393,6 @@ function loadHomeNews() {
   );
 
 }
-
 
 /* ================================
    START
