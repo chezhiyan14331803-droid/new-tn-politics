@@ -213,7 +213,19 @@
 
         </section>
 
+<!-- ================= TRENDING NEWS SECTION ================= -->
+        <section class="trending-section">
+            <div class="section-header">
+                <h2>🔥 Trending News</h2>
+                <p>Most read stories today across Tamil Nadu</p>
+            </div>
 
+            <div class="trending-grid" id="trendingNewsGrid">
+                <div class="archive-loading">
+                    <p>Loading trending stories...</p>
+                </div>
+            </div>
+        </section>
         <!-- Previous News -->
         <section class="section" id="previous">
 
@@ -325,7 +337,17 @@
 
     <script src="script.js"></script>
     <script type="module" src="home-news.js"></script>
-
+    <script>
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("sw.js")
+        .then(reg => console.log("PWA Service Worker registered!", reg.scope))
+        .catch(err => console.warn("Service Worker registration failed:", err));
+    });
+  }
+</script>
 </body>
 </html>
 ```
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#e11d48">
