@@ -1,10 +1,13 @@
 import {
   collection,
+  doc,
+  increment,
   onSnapshot,
   limit,
   orderBy,
-  query
-} from "https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js";
+  query,
+  updateDoc
+} from "[https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js](https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js)";
 
 import { db } from "./firebase-config.js";
 
@@ -46,12 +49,11 @@ const breakingNewsText =
 ================================ */
 
 function formatDate(dateString) {
-
   if (!dateString) return "";
 
   const date = new Date(dateString);
 
-  if (isNaN(date)) {
+  if (isNaN(date.getTime())) {
     return dateString;
   }
 
@@ -71,7 +73,6 @@ function formatDate(dateString) {
 ================================ */
 
 function categoryName(category) {
-
   if (!category) {
     return "News";
   }
@@ -87,12 +88,23 @@ function categoryName(category) {
 
 
 /* ================================
-   READER LINK
+   READER LINK & VIEW TRACKER
 ================================ */
 
 function createReaderLink(id) {
-
   return `reader.html?type=automatic&id=${encodeURIComponent(id)}`;
+}
+
+async function trackArticleClick(articleId) {
+  if (!articleId) return;
+  try {
+    const articleRef = doc(db, "automaticNews", articleId);
+    await updateDoc(articleRef, {
+      views: increment(1)
+    });
+  } catch (error) {
+    console.warn("View tracking update skipped:", error);
+  }
 }
 
 
@@ -101,9 +113,7 @@ function createReaderLink(id) {
 ================================ */
 
 function getCategoryIcon(category) {
-
-  const value =
-    String(category || "").toLowerCase();
+  const value = String(category || "").toLowerCase();
 
   if (value.includes("politics")) return "🏛️";
   if (value.includes("sports")) return "🏏";
@@ -127,19 +137,9 @@ function displayNews(newsItems) {
   /* ---------- NO NEWS ---------- */
 
   if (newsItems.length === 0) {
-
-    homeNewsTitle.textContent =
-      "No automatic news available.";
-
-    homeNewsDescription.textContent =
-      "Please check back later.";
-
-    if (breakingNewsText) {
-
-      breakingNewsText.textContent =
-        "No latest news available.";
-    }
-
+    if (homeNewsTitle) homeNewsTitle.textContent = "No automatic news available.";
+    if (homeNewsDescription) homeNewsDescription.textContent = "Please check back later.";
+    if (breakingNewsText) breakingNewsText.textContent = "No latest news available.";
     return;
   }
 
@@ -147,125 +147,95 @@ function displayNews(newsItems) {
   /* ---------- LATEST NEWS ---------- */
 
   const latest = newsItems[0];
+  const latestReaderLink = createReaderLink(latest.id);
 
 
   /* ---------- BREAKING NEWS ---------- */
 
   if (breakingNewsText) {
-
-    breakingNewsText.textContent =
-      latest.title ||
-      "Latest news available now";
-
-    breakingNewsText.style.cursor =
-      "pointer";
+    breakingNewsText.textContent = latest.title || "Latest news available now";
+    breakingNewsText.style.cursor = "pointer";
 
     breakingNewsText.onclick = () => {
-
-      window.location.href =
-        createReaderLink(latest.id);
-
+      trackArticleClick(latest.id);
+      window.location.href = latestReaderLink;
     };
   }
 
 
   /* ---------- TODAY'S NEWS CARD ---------- */
 
-  homeNewsDate.textContent =
-    formatDate(latest.publishedAt);
+  if (homeNewsDate) homeNewsDate.textContent = formatDate(latest.publishedAt || latest.savedAt);
 
-  homeNewsCategory.textContent =
-    `${getCategoryIcon(latest.category)}
-     ${categoryName(latest.category)}`;
+  if (homeNewsCategory) {
+    const districtTag = latest.district ? ` • 📍 ${latest.district}` : "";
+    homeNewsCategory.textContent = `${getCategoryIcon(latest.category)} ${categoryName(latest.category)}${districtTag}`;
+  }
 
-  homeNewsTitle.textContent =
-    latest.title ||
-    "Latest News";
-
-  homeNewsDescription.textContent =
-    latest.description ||
-    "Read the latest news.";
+  if (homeNewsTitle) homeNewsTitle.textContent = latest.title || "Latest News";
+  if (homeNewsDescription) homeNewsDescription.textContent = latest.description || "Read the latest news.";
 
 
   /* ---------- READER BUTTONS ---------- */
 
-  const latestReaderLink =
-    createReaderLink(latest.id);
+  if (heroReadButton) {
+    heroReadButton.href = latestReaderLink;
+    heroReadButton.removeAttribute("target");
+    heroReadButton.onclick = () => trackArticleClick(latest.id);
+  }
 
-  heroReadButton.href =
-    latestReaderLink;
-
-  homeReadButton.href =
-    latestReaderLink;
-
-  heroReadButton.removeAttribute("target");
-
-  homeReadButton.removeAttribute("target");
+  if (homeReadButton) {
+    homeReadButton.href = latestReaderLink;
+    homeReadButton.removeAttribute("target");
+    homeReadButton.onclick = () => trackArticleClick(latest.id);
+  }
 
 
   /* ---------- PREVIOUS NEWS ---------- */
 
-  const today = new Date().toLocaleDateString("en-IN");
+  const previousNews = newsItems.slice(1);
 
-const previousNews = newsItems
-  .slice(1)
-  .filter(news => {
-    if (!news.publishedAt) return false;
-
-    const newsDate = new Date(news.publishedAt)
-      .toLocaleDateString("en-IN");
-
-    return newsDate === today;
-  });
-
+  if (!previousNewsGrid) return;
 
   if (previousNews.length === 0) {
-
-    previousNewsGrid.innerHTML =
-      "<p>No previous automatic news yet.</p>";
-
+    previousNewsGrid.innerHTML = "<p>No previous automatic news yet.</p>";
     return;
   }
 
+  previousNewsGrid.innerHTML = previousNews
+    .map(news => {
+      const readerLink = createReaderLink(news.id);
+      const districtTag = news.district ? ` • 📍 ${news.district}` : "";
 
-  previousNewsGrid.innerHTML =
-    previousNews
-      .map(news => {
+      return `
+        <article class="publication-item">
+          <div>
+            <p class="news-category">
+              ${getCategoryIcon(news.category)}
+              ${categoryName(news.category)}
+              ${districtTag}
+            </p>
 
-        const readerLink =
-          createReaderLink(news.id);
+            <strong>
+              ${news.title || "Latest News"}
+            </strong>
 
-        return `
-          <article class="publication-item">
+            <p>
+              📅 ${formatDate(news.publishedAt || news.savedAt)}
+            </p>
+          </div>
 
-            <div>
-
-              <p class="news-category">
-                ${getCategoryIcon(news.category)}
-                ${categoryName(news.category)}
-              </p>
-
-              <strong>
-                ${news.title || "Latest News"}
-              </strong>
-
-              <p>
-                ${formatDate(news.publishedAt)}
-              </p>
-
-            </div>
-
-            <a
-              class="read-button"
-              href="${readerLink}"
-            >
-              Read News
-            </a>
-
-          </article>
-        `;
-      })
-      .join("");
+          <a
+            class="read-button"
+            href="${readerLink}"
+            onclick="trackArticleClick('${news.id}')"
+          >
+            Read News
+          </a>
+        </article>
+      `;
+    })
+    .join("");
 }
 
 
@@ -274,125 +244,65 @@ const previousNews = newsItems
 ================================ */
 
 function setupCategoryButtons() {
-
-  const categoryButtons =
-    document.querySelectorAll(
-      ".category-grid button"
-    );
-
+  const categoryButtons = document.querySelectorAll(".category-grid button");
 
   categoryButtons.forEach(button => {
+    button.addEventListener("click", () => {
+      const category = button.textContent
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, "-");
 
-    button.addEventListener(
-      "click",
-      () => {
-
-        const category =
-          button.textContent
-            .trim()
-            .toLowerCase()
-            .replace(/\s+/g, "-");
-
-
-        window.location.href =
-          `archive.html?category=${encodeURIComponent(category)}`;
-
-      }
-    );
-
+      window.location.href = `archive.html?category=${encodeURIComponent(category)}`;
+    });
   });
-
 }
 
 
+/* ================================
+   LOAD HOME NEWS
+================================ */
+
 function loadHomeNews() {
-
-  /* ---------- CURRENT DATE ---------- */
-
-  homeSectionDate.textContent =
-    new Date().toLocaleDateString(
-      "en-IN",
-      {
-        day: "numeric",
-        month: "long",
-        year: "numeric"
-      }
-    );
-
-
-  /* ---------- CATEGORY SETUP ---------- */
+  if (homeSectionDate) {
+    homeSectionDate.textContent = new Date().toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "long",
+      year: "numeric"
+    });
+  }
 
   setupCategoryButtons();
 
+  // Make trackArticleClick globally accessible for inline onclick handlers
+  window.trackArticleClick = trackArticleClick;
 
-  /* ---------- FIRESTORE QUERY ---------- */
-
-  const newsQuery =
-    query(
-      collection(db, "automaticNews"),
-      orderBy("savedAt", "desc"),
-      limit(20)
-    );
-
-
-  /* ---------- REALTIME LISTENER ---------- */
-
-  onSnapshot(
-
-    newsQuery,
-
-    snapshot => {
-
-      console.log(
-        "Automatic news updated!"
-      );
-
-
-      /* ---------- GET NEWS ---------- */
-
-      const newsItems =
-        snapshot.docs.map(doc => ({
-
-          id: doc.id,
-
-          ...doc.data()
-
-        }));
-
-      /* ---------- DISPLAY ---------- */
-
-      displayNews(newsItems);
-
-    },
-
-
-    error => {
-
-      console.error(
-        "Realtime news error:",
-        error
-      );
-
-
-      homeNewsTitle.textContent =
-        "Unable to load automatic news.";
-
-      homeNewsDescription.textContent =
-        "Please try again later.";
-
-
-      if (breakingNewsText) {
-
-        breakingNewsText.textContent =
-          "Unable to load latest news.";
-
-      }
-
-    }
-
+  const newsQuery = query(
+    collection(db, "automaticNews"),
+    orderBy("publishedAt", "desc"),
+    limit(20)
   );
 
+  onSnapshot(
+    newsQuery,
+    snapshot => {
+      console.log("Automatic news updated!");
+      const newsItems = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      displayNews(newsItems);
+    },
+    error => {
+      console.error("Realtime news error:", error);
+
+      if (homeNewsTitle) homeNewsTitle.textContent = "Unable to load automatic news.";
+      if (homeNewsDescription) homeNewsDescription.textContent = "Please try again later.";
+      if (breakingNewsText) breakingNewsText.textContent = "Unable to load latest news.";
+    }
+  );
 }
+
 
 /* ================================
    START
