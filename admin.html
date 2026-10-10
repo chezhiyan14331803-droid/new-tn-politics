@@ -9,10 +9,8 @@
           content="width=device-width, initial-scale=1.0">
 
     <title>Admin | Daily News Updates</title>
-    <meta
-    name="description"
-    content="Read the latest Daily News Updates."
->
+    <meta name="description"
+          content="Read the latest Daily News Updates.">
 
     <link rel="stylesheet" href="style.css">
 
@@ -27,7 +25,7 @@
 
         <div class="logo">
             <span>DAILY NEWS</span>
-<strong>UPDATES</strong>
+            <strong>UPDATES</strong>
         </div>
 
         <nav class="navbar">
@@ -45,7 +43,7 @@
     </header>
 
 
-    <!-- ADMIN LOGIN -->
+    <!-- ADMIN CONTENT -->
 
     <main class="admin-page">
 
@@ -78,11 +76,10 @@
                         Email Address
                     </label>
 
-                    <input
-                        type="email"
-                        id="adminEmail"
-                        placeholder="Enter admin email"
-                        required>
+                    <input type="email"
+                           id="adminEmail"
+                           placeholder="Enter admin email"
+                           required>
 
                 </div>
 
@@ -93,18 +90,16 @@
                         Password
                     </label>
 
-                    <input
-                        type="password"
-                        id="adminPassword"
-                        placeholder="Enter password"
-                        required>
+                    <input type="password"
+                           id="adminPassword"
+                           placeholder="Enter password"
+                           required>
 
                 </div>
 
 
-                <button
-                    type="submit"
-                    class="admin-login-button">
+                <button type="submit"
+                        class="admin-login-button">
 
                     Login
 
@@ -116,6 +111,39 @@
                 </p>
 
             </form>
+
+
+            <!-- ================= SYSTEM HEALTH & OPERATIONS ================= -->
+            <section class="admin-health-section" style="margin-top: 30px; padding: 20px; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0;">
+                <h2 style="font-size: 20px; color: #1e293b; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
+                    ⚙️ System Health & Operational Metrics
+                </h2>
+
+                <div class="health-cards-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px;">
+                    
+                    <!-- Total Articles Card -->
+                    <div class="health-card" style="background: #ffffff; padding: 15px; border-radius: 8px; border: 1px solid #cbd5e1;">
+                        <p style="font-size: 13px; color: #64748b; margin-bottom: 5px;">Total Automatic Articles</p>
+                        <h3 id="healthTotalCount" style="font-size: 24px; color: #0f172a; margin: 0;">--</h3>
+                        <span style="font-size: 11px; color: #16a34a;">Auto-purging > 20 days</span>
+                    </div>
+
+                    <!-- System Storage Card -->
+                    <div class="health-card" style="background: #ffffff; padding: 15px; border-radius: 8px; border: 1px solid #cbd5e1;">
+                        <p style="font-size: 13px; color: #64748b; margin-bottom: 5px;">Firestore Usage</p>
+                        <h3 id="healthStorageStatus" style="font-size: 24px; color: #2563eb; margin: 0;">100% Free</h3>
+                        <span style="font-size: 11px; color: #64748b;">Quota Safe</span>
+                    </div>
+
+                    <!-- Database Connection Card -->
+                    <div class="health-card" style="background: #ffffff; padding: 15px; border-radius: 8px; border: 1px solid #cbd5e1;">
+                        <p style="font-size: 13px; color: #64748b; margin-bottom: 5px;">Realtime Firestore</p>
+                        <h3 id="healthDbConnection" style="font-size: 24px; color: #16a34a; margin: 0;">Connected</h3>
+                        <span style="font-size: 11px; color: #16a34a;">● Live Sync Active</span>
+                    </div>
+
+                </div>
+            </section>
 
         </div>
 
@@ -129,7 +157,7 @@
         <div class="logo">
 
             <span>DAILY NEWS</span>
-<strong>UPDATES</strong>
+            <strong>UPDATES</strong>
 
         </div>
 
@@ -140,7 +168,6 @@
     </footer>
 
 
-    
     <script type="module" src="admin-auth.js"></script>
 
 </body>

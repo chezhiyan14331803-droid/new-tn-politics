@@ -4,6 +4,40 @@ import {
 } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-auth.js";
 
 import { auth } from "./firebase-config.js";
+/* =========================================
+   SYSTEM HEALTH MONITORING
+========================================= */
+function initSystemHealth() {
+  const healthTotalCount = document.getElementById("healthTotalCount");
+  const healthDbConnection = document.getElementById("healthDbConnection");
+
+  if (!healthTotalCount) return;
+
+  const automaticCollection = collection(db, "automaticNews");
+
+  onSnapshot(
+    automaticCollection,
+    snapshot => {
+      // Update article count
+      healthTotalCount.textContent = snapshot.size;
+
+      if (healthDbConnection) {
+        healthDbConnection.textContent = "Connected";
+        healthDbConnection.style.color = "#16a34a";
+      }
+    },
+    error => {
+      console.warn("Health check snapshot warning:", error);
+      if (healthDbConnection) {
+        healthDbConnection.textContent = "Error";
+        healthDbConnection.style.color = "#dc2626";
+      }
+    }
+  );
+}
+
+// Start Health Monitor
+initSystemHealth();
 
 const loginForm = document.getElementById("adminLoginForm");
 const emailInput = document.getElementById("adminEmail");
