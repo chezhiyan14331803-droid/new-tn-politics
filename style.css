@@ -3905,13 +3905,20 @@ body.dark-mode .reader-description {
     100% { opacity: 1; }
 }
 /* Prevent Google top anchor/banner overlays from covering the website header */
-ins.adsbygoogle[data-ad-status="filled"] {
-  top: auto !important;
-  bottom: 0 !important;
+/* =========================================
+   HIDE TOP ADSENSE HEADER UNITS
+========================================= */
+
+/* Hide any AdSense unit inserted before or inside the header */
+header.header ~ ins.adsbygoogle,
+header.header ins.adsbygoogle,
+body > ins.adsbygoogle:first-of-type {
+  display: none !important;
 }
 
-/* Push any top-inserted in-page auto ads below the header */
-body > ins.adsbygoogle:first-child {
-  order: 999;
-  margin-top: 20px;
+/* Force bottom position for overlay ads */
+.adsbygoogle-noablate,
+ins.adsbygoogle[data-anchor-status="displayed"] {
+  top: 0 !important;
+  bottom: auto !important;
 }
