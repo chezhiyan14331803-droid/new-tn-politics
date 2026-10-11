@@ -3919,6 +3919,6 @@ body > ins.adsbygoogle:first-of-type {
 /* Force bottom position for overlay ads */
 .adsbygoogle-noablate,
 ins.adsbygoogle[data-anchor-status="displayed"] {
-  top: 0 !important;
-  bottom: auto !important;
+  top: auto !important;
+  bottom: 0 !important;
 }
