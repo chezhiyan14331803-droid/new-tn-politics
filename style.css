@@ -3904,3 +3904,14 @@ body.dark-mode .reader-description {
     50% { opacity: 0.7; }
     100% { opacity: 1; }
 }
+/* Prevent Google top anchor/banner overlays from covering the website header */
+ins.adsbygoogle[data-ad-status="filled"] {
+  top: auto !important;
+  bottom: 0 !important;
+}
+
+/* Push any top-inserted in-page auto ads below the header */
+body > ins.adsbygoogle:first-child {
+  order: 999;
+  margin-top: 20px;
+}
