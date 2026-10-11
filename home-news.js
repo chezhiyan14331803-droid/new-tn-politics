@@ -5,11 +5,11 @@ import {
   onSnapshot,
   limit,
   query,
+  orderBy,
   updateDoc
 } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js";
 
 import { db } from "./firebase-config.js";
-
 
 /* ================================
    HOMEPAGE ELEMENTS
@@ -25,7 +25,6 @@ const homeReadButton = document.getElementById("homeReadButton");
 const previousNewsGrid = document.getElementById("previousNewsGrid");
 const breakingNewsText = document.getElementById("breakingNewsText");
 
-
 /* ================================
    HELPERS
 ================================ */
@@ -33,13 +32,7 @@ const breakingNewsText = document.getElementById("breakingNewsText");
 function parseArticleDate(article) {
   if (!article) return 0;
   
-  // Try publishedAt standard date string
-  if (article.publishedAt) {
-    const date = new Date(article.publishedAt);
-    if (!isNaN(date.getTime())) return date.getTime();
-  }
-
-  // Fallback to savedAt Firestore Timestamp or Date
+  // 1. Check savedAt Firestore Timestamp
   if (article.savedAt) {
     if (typeof article.savedAt.toMillis === "function") {
       return article.savedAt.toMillis();
@@ -51,20 +44,26 @@ function parseArticleDate(article) {
     if (!isNaN(date.getTime())) return date.getTime();
   }
 
+  // 2. Check publishedAt string
+  if (article.publishedAt) {
+    const date = new Date(article.publishedAt);
+    if (!isNaN(date.getTime())) return date.getTime();
+  }
+
   return 0;
 }
 
-function formatDate(dateStringOrTimestamp) {
-  if (!dateStringOrTimestamp) return "";
+function formatDate(dateValue) {
+  if (!dateValue) return "";
 
   let date;
-  if (typeof dateStringOrTimestamp.toDate === "function") {
-    date = dateStringOrTimestamp.toDate();
+  if (dateValue && typeof dateValue.toDate === "function") {
+    date = dateValue.toDate();
   } else {
-    date = new Date(dateStringOrTimestamp);
+    date = new Date(dateValue);
   }
 
-  if (isNaN(date.getTime())) return String(dateStringOrTimestamp);
+  if (isNaN(date.getTime())) return String(dateValue);
 
   return date.toLocaleDateString("en-IN", {
     day: "numeric",
@@ -109,7 +108,6 @@ async function trackArticleClick(articleId) {
 }
 window.trackArticleClick = trackArticleClick;
 
-
 /* ================================
    DISPLAY NEWS
 ================================ */
@@ -137,7 +135,7 @@ function displayNews(newsItems) {
   }
 
   /* Main Featured Article */
-  if (homeNewsDate) homeNewsDate.textContent = formatDate(latest.publishedAt || latest.savedAt);
+  if (homeNewsDate) homeNewsDate.textContent = formatDate(latest.savedAt || latest.publishedAt);
   if (homeNewsCategory) {
     const districtTag = latest.district ? ` • 📍 ${latest.district}` : "";
     homeNewsCategory.textContent = `${getCategoryIcon(latest.category)} ${categoryName(latest.category)}${districtTag}`;
@@ -154,7 +152,7 @@ function displayNews(newsItems) {
     homeReadButton.onclick = () => trackArticleClick(latest.id);
   }
 
-  /* Grid Articles */
+  /* Grid Articles (Previous News) */
   const previousNews = newsItems.slice(1);
   if (!previousNewsGrid) return;
 
@@ -175,7 +173,7 @@ function displayNews(newsItems) {
               ${getCategoryIcon(news.category)} ${categoryName(news.category)}${districtTag}
             </p>
             <strong>${news.title || "Latest News"}</strong>
-            <p>📅 ${formatDate(news.publishedAt || news.savedAt)}</p>
+            <p>📅 ${formatDate(news.savedAt || news.publishedAt)}</p>
           </div>
           <a class="read-button" href="${readerLink}" onclick="trackArticleClick('${news.id}')">
             Read News
@@ -186,7 +184,6 @@ function displayNews(newsItems) {
     .join("");
 }
 
-
 /* ================================
    LOAD TRENDING NEWS
 ================================ */
@@ -195,9 +192,11 @@ function loadTrendingNews() {
   const trendingGrid = document.getElementById("trendingNewsGrid");
   if (!trendingGrid) return;
 
+  // Query database with explicit descending order by savedAt to get the newest batch first
   const trendingQuery = query(
     collection(db, "automaticNews"),
-    limit(20)
+    orderBy("savedAt", "desc"),
+    limit(30)
   );
 
   onSnapshot(
@@ -213,9 +212,7 @@ function loadTrendingNews() {
         ...doc.data()
       }));
 
-      // SORTING LOGIC:
-      // 1. Highest views first
-      // 2. If views are equal (e.g. 0 views), sort by newest published/saved date
+      // Sort by views first. Fallback to newest publication/saved time if views are equal
       trendingItems.sort((a, b) => {
         const viewsA = a.views || 0;
         const viewsB = b.views || 0;
@@ -224,9 +221,7 @@ function loadTrendingNews() {
           return viewsB - viewsA;
         }
 
-        const dateA = parseArticleDate(a);
-        const dateB = parseArticleDate(b);
-        return dateB - dateA;
+        return parseArticleDate(b) - parseArticleDate(a);
       });
 
       trendingItems = trendingItems.slice(0, 4);
@@ -259,12 +254,25 @@ function loadTrendingNews() {
         .join("");
     },
     error => {
-      console.warn("Trending news load error:", error);
-      trendingGrid.innerHTML = "<p>Trending stories will appear as views build up!</p>";
+      console.warn("Trending news load fallback error:", error);
+      // Fallback query if Firestore index is building
+      const fallbackQuery = query(collection(db, "automaticNews"), limit(30));
+      onSnapshot(fallbackQuery, fallbackSnap => {
+        let trendingItems = fallbackSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        trendingItems.sort((a, b) => (b.views || 0) - (a.views || 0) || (parseArticleDate(b) - parseArticleDate(a)));
+        trendingGrid.innerHTML = trendingItems.slice(0, 4).map((news, index) => `
+          <article class="trending-card">
+            <div>
+              <span class="trending-badge">#${index + 1} Most Read</span>
+              <strong>${news.title || "Trending News"}</strong>
+            </div>
+            <a class="read-button" href="${createReaderLink(news.id)}" onclick="trackArticleClick('${news.id}')" style="margin-top: 15px;">Read News</a>
+          </article>
+        `).join("");
+      });
     }
   );
 }
-
 
 /* ================================
    SETUP CATEGORY BUTTONS
@@ -285,7 +293,6 @@ function setupCategoryButtons() {
   });
 }
 
-
 /* ================================
    MAIN LOAD FUNCTION
 ================================ */
@@ -302,16 +309,16 @@ function loadHomeNews() {
   setupCategoryButtons();
   loadTrendingNews();
 
+  // Query database ordered by newest saved date
   const newsQuery = query(
     collection(db, "automaticNews"),
-    limit(20)
+    orderBy("savedAt", "desc"),
+    limit(30)
   );
 
   onSnapshot(
     newsQuery,
     snapshot => {
-      console.log("Automatic news loaded! Count:", snapshot.size);
-
       if (snapshot.empty) {
         if (homeNewsTitle) homeNewsTitle.textContent = "No automatic news available.";
         if (homeNewsDescription) homeNewsDescription.textContent = "Please check back later.";
@@ -324,21 +331,21 @@ function loadHomeNews() {
         ...doc.data()
       }));
 
-      newsItems.sort((a, b) => {
-        const dateA = parseArticleDate(a);
-        const dateB = parseArticleDate(b);
-        return dateB - dateA;
-      });
+      // Sort explicitly in memory to ensure October 11 news is on top
+      newsItems.sort((a, b) => parseArticleDate(b) - parseArticleDate(a));
 
       displayNews(newsItems);
     },
     error => {
-      console.error("Realtime news error:", error);
-
-      if (homeNewsTitle) homeNewsTitle.textContent = "Unable to load automatic news.";
-      if (homeNewsDescription) homeNewsDescription.textContent = "Please try again later.";
-      if (breakingNewsText) breakingNewsText.textContent = "Unable to load latest news.";
-      if (previousNewsGrid) previousNewsGrid.innerHTML = "<p>Error loading news. Check browser console.</p>";
+      console.warn("Main news query fallback triggered:", error);
+      
+      // Fallback query if index is initializing
+      const fallbackNewsQuery = query(collection(db, "automaticNews"), limit(30));
+      onSnapshot(fallbackNewsQuery, snap => {
+        let newsItems = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        newsItems.sort((a, b) => parseArticleDate(b) - parseArticleDate(a));
+        displayNews(newsItems);
+      });
     }
   );
 }
