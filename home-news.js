@@ -18,7 +18,7 @@ import { db } from "./firebase-config.js";
 function parseArticleDate(article) {
   if (!article) return 0;
 
-  // 1. Prioritize updatedAt (holds the Oct 11 runner fetch time)
+  // 1. Prioritize updatedAt (holds runner fetch time)
   if (article.updatedAt) {
     if (typeof article.updatedAt.toMillis === "function") return article.updatedAt.toMillis();
     if (typeof article.updatedAt.toDate === "function") return article.updatedAt.toDate().getTime();
@@ -78,8 +78,8 @@ function getCategoryIcon(category) {
   return "📰";
 }
 
-function createReaderLink(id) {
-  return `reader.html?type=automatic&id=${encodeURIComponent(id)}`;
+function createReaderLink(id, type = "automatic") {
+  return `reader.html?type=${encodeURIComponent(type)}&id=${encodeURIComponent(id)}`;
 }
 
 async function trackArticleClick(articleId) {
@@ -107,6 +107,10 @@ function displayNews(newsItems) {
   const heroReadButton = document.getElementById("heroReadButton");
   const homeReadButton = document.getElementById("homeReadButton");
 
+  // DOM elements for PDF badge & download button on Today's Card
+  const todayPdfIcon = document.querySelector(".today-card .pdf-icon");
+  const todayDownloadBtn = document.querySelector(".today-card .download-button");
+
   if (!newsItems || newsItems.length === 0) {
     if (homeNewsTitle) homeNewsTitle.textContent = "No news available.";
     if (previousNewsGrid) previousNewsGrid.innerHTML = "<p>No news available yet.</p>";
@@ -114,7 +118,22 @@ function displayNews(newsItems) {
   }
 
   const latest = newsItems[0];
-  const latestReaderLink = createReaderLink(latest.id);
+  const articleType = latest.type || "automatic";
+  const latestReaderLink = createReaderLink(latest.id, articleType);
+  const hasPdf = Boolean(latest.pdfUrl && articleType !== "automatic");
+
+  /* Handle PDF element visibility on Today's Card */
+  if (todayPdfIcon) {
+    todayPdfIcon.style.display = hasPdf ? "flex" : "none";
+  }
+  if (todayDownloadBtn) {
+    if (hasPdf) {
+      todayDownloadBtn.style.display = "inline-block";
+      todayDownloadBtn.onclick = () => window.open(latest.pdfUrl, "_blank");
+    } else {
+      todayDownloadBtn.style.display = "none";
+    }
+  }
 
   /* Hero Section */
   if (breakingNewsText) {
@@ -149,7 +168,8 @@ function displayNews(newsItems) {
 
   previousNewsGrid.innerHTML = previousNews
     .map(news => {
-      const readerLink = createReaderLink(news.id);
+      const type = news.type || "automatic";
+      const readerLink = createReaderLink(news.id, type);
       const districtTag = news.district ? ` • 📍 ${news.district}` : "";
 
       return `
@@ -193,6 +213,7 @@ function loadTrendingNews() {
     });
 
     trendingGrid.innerHTML = trendingItems.slice(0, 4).map((news, index) => {
+      const type = news.type || "automatic";
       const districtTag = news.district ? ` • 📍 ${news.district}` : "";
       return `
         <article class="trending-card">
@@ -201,7 +222,7 @@ function loadTrendingNews() {
             <p class="news-category">${getCategoryIcon(news.category)} ${categoryName(news.category)}${districtTag}</p>
             <strong>${news.title || "Trending News"}</strong>
           </div>
-          <a class="read-button" href="${createReaderLink(news.id)}" onclick="trackArticleClick('${news.id}')" style="margin-top: 15px;">Read News</a>
+          <a class="read-button" href="${createReaderLink(news.id, type)}" onclick="trackArticleClick('${news.id}')" style="margin-top: 15px;">Read News</a>
         </article>
       `;
     }).join("");

@@ -17,6 +17,15 @@ const pdfContainer = document.querySelector(".pdf-container");
 const readerActions = document.querySelector(".reader-actions");
 const readerDownload = document.getElementById("readerDownload");
 
+// Engagement buttons
+const whatsappShareBtn = document.getElementById("whatsappShareBtn");
+const nativeShareBtn = document.getElementById("nativeShareBtn");
+const audioNewsBtn = document.getElementById("audioNewsBtn");
+
+let currentArticleTitle = "";
+let currentArticleText = "";
+let isSpeaking = false;
+
 /* =========================================
    HELPERS & DATE PARSING
 ========================================= */
@@ -60,6 +69,86 @@ function formatDate(data) {
 }
 
 /* =========================================
+   BUTTON ACTIONS & EVENT LISTENERS
+========================================= */
+
+// 1. Share Functionality
+function setupSharing() {
+  const articleUrl = window.location.href;
+
+  // Global Share Function (for inline onclick="shareNews()")
+  window.shareNews = function () {
+    if (navigator.share) {
+      navigator.share({
+        title: currentArticleTitle || document.title,
+        text: currentArticleTitle,
+        url: articleUrl
+      }).catch(err => console.log("Share canceled:", err));
+    } else {
+      navigator.clipboard.writeText(articleUrl).then(() => {
+        alert("Article link copied to clipboard!");
+      });
+    }
+  };
+
+  // WhatsApp Button
+  if (whatsappShareBtn) {
+    whatsappShareBtn.addEventListener("click", () => {
+      const message = encodeURIComponent(`📰 *${currentArticleTitle}*\n\nRead more here: ${articleUrl}`);
+      window.open(`https://api.whatsapp.com/send?text=${message}`, "_blank");
+    });
+  }
+
+  // Native Share Button
+  if (nativeShareBtn) {
+    nativeShareBtn.addEventListener("click", () => {
+      window.shareNews();
+    });
+  }
+}
+
+// 2. Text-to-Speech (Audio)
+function setupAudioPlayer() {
+  if (!audioNewsBtn) return;
+
+  if (!("speechSynthesis" in window)) {
+    audioNewsBtn.style.display = "none";
+    return;
+  }
+
+  audioNewsBtn.addEventListener("click", () => {
+    if (isSpeaking) {
+      window.speechSynthesis.cancel();
+      isSpeaking = false;
+      audioNewsBtn.innerHTML = "🔊 Listen to News";
+      return;
+    }
+
+    const textToRead = `${currentArticleTitle}. ${currentArticleText}`;
+    if (!textToRead.trim()) return;
+
+    const utterance = new SpeechSynthesisUtterance(textToRead);
+    utterance.lang = "en-IN";
+    utterance.rate = 1.0;
+
+    utterance.onend = () => {
+      isSpeaking = false;
+      audioNewsBtn.innerHTML = "🔊 Listen to News";
+    };
+
+    utterance.onerror = () => {
+      isSpeaking = false;
+      audioNewsBtn.innerHTML = "🔊 Listen to News";
+    };
+
+    window.speechSynthesis.cancel(); // Stop any ongoing speech
+    window.speechSynthesis.speak(utterance);
+    isSpeaking = true;
+    audioNewsBtn.innerHTML = "⏹️ Stop Listening";
+  });
+}
+
+/* =========================================
    LOAD ARTICLE
 ========================================= */
 
@@ -84,11 +173,13 @@ async function loadArticle() {
     }
 
     const data = docSnap.data();
+    currentArticleTitle = data.title || "Untitled Article";
+    currentArticleText = data.description || data.content || data.body || "";
 
     // 1. Title
     if (readerTitle) {
-      readerTitle.textContent = data.title || "Untitled Article";
-      document.title = `${data.title || "News Article"} | Daily News`;
+      readerTitle.textContent = currentArticleTitle;
+      document.title = `${currentArticleTitle} | Daily News`;
     }
 
     // 2. Date & Source Meta
@@ -98,9 +189,8 @@ async function loadArticle() {
       readerDate.textContent = `📅 ${formattedDate}${sourceTag}`;
     }
 
-    // 3. Render Body Content or PDF Viewer
+    // 3. Render Content Body or PDF Viewer
     if (type === "automatic") {
-      // Hide PDF Viewer and PDF Action Buttons for web articles
       if (pdfContainer) pdfContainer.style.display = "none";
       if (readerActions) readerActions.style.display = "none";
 
@@ -108,10 +198,10 @@ async function loadArticle() {
         readerDescription.style.display = "block";
 
         const imageHtml = data.imageUrl
-          ? `<img src="${data.imageUrl}" alt="${data.title || 'News Image'}" style="width:100%; max-height:450px; object-fit:cover; border-radius:12px; margin-bottom:20px;" onerror="this.style.display='none'" />`
+          ? `<img src="${data.imageUrl}" alt="${currentArticleTitle}" style="width:100%; max-height:450px; object-fit:cover; border-radius:12px; margin-bottom:20px;" onerror="this.style.display='none'" />`
           : "";
 
-        const textContent = data.description || data.content || data.body || "No detailed description available for this headline.";
+        const textContent = currentArticleText || "No detailed description available for this headline.";
 
         const sourceBtn = data.sourceUrl
           ? `<div style="margin-top: 30px; padding-top: 15px; border-top: 1px solid #eee;">
@@ -130,7 +220,7 @@ async function loadArticle() {
         `;
       }
     } else {
-      // PDF News mode
+      // PDF mode
       if (readerDescription) readerDescription.style.display = "none";
 
       if (pdfContainer) pdfContainer.style.display = "block";
@@ -139,6 +229,10 @@ async function loadArticle() {
       if (readerPdf) readerPdf.src = data.pdfUrl || "";
       if (readerDownload) readerDownload.href = data.pdfUrl || "#";
     }
+
+    // Initialize button listeners after loading content
+    setupSharing();
+    setupAudioPlayer();
 
   } catch (error) {
     console.error("Error loading reader article:", error);
