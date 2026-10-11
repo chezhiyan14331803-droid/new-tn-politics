@@ -12,59 +12,44 @@ import {
 import { db } from "./firebase-config.js";
 
 /* ================================
-   HOMEPAGE ELEMENTS
-================================ */
-
-const homeSectionDate = document.getElementById("homeSectionDate");
-const homeNewsDate = document.getElementById("homeNewsDate");
-const homeNewsCategory = document.getElementById("homeNewsCategory");
-const homeNewsTitle = document.getElementById("homeNewsTitle");
-const homeNewsDescription = document.getElementById("homeNewsDescription");
-const heroReadButton = document.getElementById("heroReadButton");
-const homeReadButton = document.getElementById("homeReadButton");
-const previousNewsGrid = document.getElementById("previousNewsGrid");
-const breakingNewsText = document.getElementById("breakingNewsText");
-
-/* ================================
-   HELPERS
+   STRICT DATE PARSING FIX
 ================================ */
 
 function parseArticleDate(article) {
   if (!article) return 0;
-  
-  // 1. Check savedAt Firestore Timestamp
-  if (article.savedAt) {
-    if (typeof article.savedAt.toMillis === "function") {
-      return article.savedAt.toMillis();
-    }
-    if (typeof article.savedAt.toDate === "function") {
-      return article.savedAt.toDate().getTime();
-    }
-    const date = new Date(article.savedAt);
-    if (!isNaN(date.getTime())) return date.getTime();
+
+  // 1. Prioritize updatedAt (holds the Oct 11 runner fetch time)
+  if (article.updatedAt) {
+    if (typeof article.updatedAt.toMillis === "function") return article.updatedAt.toMillis();
+    if (typeof article.updatedAt.toDate === "function") return article.updatedAt.toDate().getTime();
+    if (article.updatedAt.seconds) return article.updatedAt.seconds * 1000;
+    const d = new Date(article.updatedAt);
+    if (!isNaN(d.getTime())) return d.getTime();
   }
 
-  // 2. Check publishedAt string
+  // 2. Secondary check: savedAt
+  if (article.savedAt) {
+    if (typeof article.savedAt.toMillis === "function") return article.savedAt.toMillis();
+    if (typeof article.savedAt.toDate === "function") return article.savedAt.toDate().getTime();
+    if (article.savedAt.seconds) return article.savedAt.seconds * 1000;
+    const d = new Date(article.savedAt);
+    if (!isNaN(d.getTime())) return d.getTime();
+  }
+
+  // 3. Fallback to API publishedAt string only if runner timestamps are missing
   if (article.publishedAt) {
-    const date = new Date(article.publishedAt);
-    if (!isNaN(date.getTime())) return date.getTime();
+    const d = new Date(article.publishedAt);
+    if (!isNaN(d.getTime())) return d.getTime();
   }
 
   return 0;
 }
 
-function formatDate(dateValue) {
-  if (!dateValue) return "";
-
-  let date;
-  if (dateValue && typeof dateValue.toDate === "function") {
-    date = dateValue.toDate();
-  } else {
-    date = new Date(dateValue);
-  }
-
-  if (isNaN(date.getTime())) return String(dateValue);
-
+function formatDate(article) {
+  const timestamp = parseArticleDate(article);
+  if (!timestamp) return "";
+  
+  const date = new Date(timestamp);
   return date.toLocaleDateString("en-IN", {
     day: "numeric",
     month: "long",
@@ -74,7 +59,7 @@ function formatDate(dateValue) {
 
 function categoryName(category) {
   if (!category) return "News";
-  return category
+  return String(category)
     .split("-")
     .map(word => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
@@ -109,22 +94,29 @@ async function trackArticleClick(articleId) {
 window.trackArticleClick = trackArticleClick;
 
 /* ================================
-   DISPLAY NEWS
+   RENDER HOMEPAGE
 ================================ */
 
 function displayNews(newsItems) {
+  const homeNewsTitle = document.getElementById("homeNewsTitle");
+  const homeNewsDescription = document.getElementById("homeNewsDescription");
+  const breakingNewsText = document.getElementById("breakingNewsText");
+  const previousNewsGrid = document.getElementById("previousNewsGrid");
+  const homeNewsDate = document.getElementById("homeNewsDate");
+  const homeNewsCategory = document.getElementById("homeNewsCategory");
+  const heroReadButton = document.getElementById("heroReadButton");
+  const homeReadButton = document.getElementById("homeReadButton");
+
   if (!newsItems || newsItems.length === 0) {
-    if (homeNewsTitle) homeNewsTitle.textContent = "No automatic news available.";
-    if (homeNewsDescription) homeNewsDescription.textContent = "Please check back later.";
-    if (breakingNewsText) breakingNewsText.textContent = "No latest news available.";
-    if (previousNewsGrid) previousNewsGrid.innerHTML = "<p>No automatic news available yet.</p>";
+    if (homeNewsTitle) homeNewsTitle.textContent = "No news available.";
+    if (previousNewsGrid) previousNewsGrid.innerHTML = "<p>No news available yet.</p>";
     return;
   }
 
   const latest = newsItems[0];
   const latestReaderLink = createReaderLink(latest.id);
 
-  /* Breaking News Header */
+  /* Hero Section */
   if (breakingNewsText) {
     breakingNewsText.textContent = latest.title || "Latest news available now";
     breakingNewsText.style.cursor = "pointer";
@@ -134,8 +126,7 @@ function displayNews(newsItems) {
     };
   }
 
-  /* Main Featured Article */
-  if (homeNewsDate) homeNewsDate.textContent = formatDate(latest.savedAt || latest.publishedAt);
+  if (homeNewsDate) homeNewsDate.textContent = formatDate(latest);
   if (homeNewsCategory) {
     const districtTag = latest.district ? ` • 📍 ${latest.district}` : "";
     homeNewsCategory.textContent = `${getCategoryIcon(latest.category)} ${categoryName(latest.category)}${districtTag}`;
@@ -152,14 +143,9 @@ function displayNews(newsItems) {
     homeReadButton.onclick = () => trackArticleClick(latest.id);
   }
 
-  /* Grid Articles (Previous News) */
+  /* Grid Items */
   const previousNews = newsItems.slice(1);
   if (!previousNewsGrid) return;
-
-  if (previousNews.length === 0) {
-    previousNewsGrid.innerHTML = "<p>No additional news available.</p>";
-    return;
-  }
 
   previousNewsGrid.innerHTML = previousNews
     .map(news => {
@@ -173,7 +159,7 @@ function displayNews(newsItems) {
               ${getCategoryIcon(news.category)} ${categoryName(news.category)}${districtTag}
             </p>
             <strong>${news.title || "Latest News"}</strong>
-            <p>📅 ${formatDate(news.savedAt || news.publishedAt)}</p>
+            <p>📅 ${formatDate(news)}</p>
           </div>
           <a class="read-button" href="${readerLink}" onclick="trackArticleClick('${news.id}')">
             Read News
@@ -185,119 +171,49 @@ function displayNews(newsItems) {
 }
 
 /* ================================
-   LOAD TRENDING NEWS
+   TRENDING NEWS
 ================================ */
 
 function loadTrendingNews() {
   const trendingGrid = document.getElementById("trendingNewsGrid");
   if (!trendingGrid) return;
 
-  // Query database with explicit descending order by savedAt to get the newest batch first
-  const trendingQuery = query(
-    collection(db, "automaticNews"),
-    orderBy("savedAt", "desc"),
-    limit(30)
-  );
+  const trendingQuery = query(collection(db, "automaticNews"), limit(50));
 
-  onSnapshot(
-    trendingQuery,
-    snapshot => {
-      if (snapshot.empty) {
-        trendingGrid.innerHTML = "<p>No trending articles available yet.</p>";
-        return;
-      }
+  onSnapshot(trendingQuery, snapshot => {
+    if (snapshot.empty) return;
 
-      let trendingItems = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+    let trendingItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-      // Sort by views first. Fallback to newest publication/saved time if views are equal
-      trendingItems.sort((a, b) => {
-        const viewsA = a.views || 0;
-        const viewsB = b.views || 0;
-
-        if (viewsB !== viewsA) {
-          return viewsB - viewsA;
-        }
-
-        return parseArticleDate(b) - parseArticleDate(a);
-      });
-
-      trendingItems = trendingItems.slice(0, 4);
-
-      trendingGrid.innerHTML = trendingItems
-        .map((news, index) => {
-          const readerLink = createReaderLink(news.id);
-          const districtTag = news.district ? ` • 📍 ${news.district}` : "";
-
-          return `
-            <article class="trending-card">
-              <div>
-                <span class="trending-badge">#${index + 1} Most Read</span>
-                <p class="news-category">
-                  ${getCategoryIcon(news.category)} ${categoryName(news.category)}${districtTag}
-                </p>
-                <strong>${news.title || "Trending News"}</strong>
-              </div>
-              <a
-                class="read-button"
-                href="${readerLink}"
-                onclick="trackArticleClick('${news.id}')"
-                style="margin-top: 15px;"
-              >
-                Read News
-              </a>
-            </article>
-          `;
-        })
-        .join("");
-    },
-    error => {
-      console.warn("Trending news load fallback error:", error);
-      // Fallback query if Firestore index is building
-      const fallbackQuery = query(collection(db, "automaticNews"), limit(30));
-      onSnapshot(fallbackQuery, fallbackSnap => {
-        let trendingItems = fallbackSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        trendingItems.sort((a, b) => (b.views || 0) - (a.views || 0) || (parseArticleDate(b) - parseArticleDate(a)));
-        trendingGrid.innerHTML = trendingItems.slice(0, 4).map((news, index) => `
-          <article class="trending-card">
-            <div>
-              <span class="trending-badge">#${index + 1} Most Read</span>
-              <strong>${news.title || "Trending News"}</strong>
-            </div>
-            <a class="read-button" href="${createReaderLink(news.id)}" onclick="trackArticleClick('${news.id}')" style="margin-top: 15px;">Read News</a>
-          </article>
-        `).join("");
-      });
-    }
-  );
-}
-
-/* ================================
-   SETUP CATEGORY BUTTONS
-================================ */
-
-function setupCategoryButtons() {
-  const categoryButtons = document.querySelectorAll(".category-grid button");
-
-  categoryButtons.forEach(button => {
-    button.addEventListener("click", () => {
-      const category = button.textContent
-        .trim()
-        .toLowerCase()
-        .replace(/\s+/g, "-");
-
-      window.location.href = `archive.html?category=${encodeURIComponent(category)}`;
+    trendingItems.sort((a, b) => {
+      const viewsA = Number(a.views || 0);
+      const viewsB = Number(b.views || 0);
+      if (viewsB !== viewsA) return viewsB - viewsA;
+      return parseArticleDate(b) - parseArticleDate(a);
     });
+
+    trendingGrid.innerHTML = trendingItems.slice(0, 4).map((news, index) => {
+      const districtTag = news.district ? ` • 📍 ${news.district}` : "";
+      return `
+        <article class="trending-card">
+          <div>
+            <span class="trending-badge">#${index + 1} Most Read</span>
+            <p class="news-category">${getCategoryIcon(news.category)} ${categoryName(news.category)}${districtTag}</p>
+            <strong>${news.title || "Trending News"}</strong>
+          </div>
+          <a class="read-button" href="${createReaderLink(news.id)}" onclick="trackArticleClick('${news.id}')" style="margin-top: 15px;">Read News</a>
+        </article>
+      `;
+    }).join("");
   });
 }
 
 /* ================================
-   MAIN LOAD FUNCTION
+   LOAD HOMEPAGE DATA
 ================================ */
 
 function loadHomeNews() {
+  const homeSectionDate = document.getElementById("homeSectionDate");
   if (homeSectionDate) {
     homeSectionDate.textContent = new Date().toLocaleDateString("en-IN", {
       day: "numeric",
@@ -306,45 +222,39 @@ function loadHomeNews() {
     });
   }
 
-  setupCategoryButtons();
   loadTrendingNews();
 
-  // Query database ordered by newest saved date
+  // QUERY FIRESTORE ORDERED BY SAVEDAT DESCENDING DIRECTLY
   const newsQuery = query(
     collection(db, "automaticNews"),
     orderBy("savedAt", "desc"),
-    limit(30)
+    limit(20)
   );
 
   onSnapshot(
     newsQuery,
     snapshot => {
       if (snapshot.empty) {
-        if (homeNewsTitle) homeNewsTitle.textContent = "No automatic news available.";
-        if (homeNewsDescription) homeNewsDescription.textContent = "Please check back later.";
-        if (previousNewsGrid) previousNewsGrid.innerHTML = "<p>No automatic news found in Firestore.</p>";
+        displayNews([]);
         return;
       }
 
-      let newsItems = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      let newsItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-      // Sort explicitly in memory to ensure October 11 news is on top
+      // Explicit in-memory sort fallback
       newsItems.sort((a, b) => parseArticleDate(b) - parseArticleDate(a));
 
       displayNews(newsItems);
     },
     error => {
-      console.warn("Main news query fallback triggered:", error);
-      
-      // Fallback query if index is initializing
-      const fallbackNewsQuery = query(collection(db, "automaticNews"), limit(30));
-      onSnapshot(fallbackNewsQuery, snap => {
-        let newsItems = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        newsItems.sort((a, b) => parseArticleDate(b) - parseArticleDate(a));
-        displayNews(newsItems);
+      console.warn("Firestore index error fallback:", error);
+
+      // Fallback query if Firestore index is still generating
+      const fallbackQuery = query(collection(db, "automaticNews"), limit(50));
+      onSnapshot(fallbackQuery, fallbackSnap => {
+        let fallbackItems = fallbackSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        fallbackItems.sort((a, b) => parseArticleDate(b) - parseArticleDate(a));
+        displayNews(fallbackItems);
       });
     }
   );

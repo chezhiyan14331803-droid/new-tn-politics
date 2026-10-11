@@ -1,31 +1,53 @@
 import {
   collection,
   doc,
-  getDoc,
-  getDocs,
+  increment,
+  onSnapshot,
   limit,
-  orderBy,
-  query
+  query,
+  updateDoc
 } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js";
 
 import { db } from "./firebase-config.js";
 
-/* =========================================
-   ELEMENT SELECTORS
-========================================= */
-const readerTitle = document.getElementById("readerTitle");
-const readerDate = document.getElementById("readerDate");
-const readerPdf = document.getElementById("readerPdf");
-const readerDownload = document.getElementById("readerDownload");
-const readerHeading = document.querySelector(".reader-heading");
+/* ================================
+   HELPERS & STRICT DATE PARSING
+================================ */
 
-/* =========================================
-   UTILITY FUNCTIONS
-========================================= */
-function formatDate(dateString) {
-  if (!dateString) return "";
-  const date = new Date(dateString);
-  if (isNaN(date)) return dateString;
+function parseArticleDate(article) {
+  if (!article) return 0;
+
+  // 1. Read savedAt (Firestore Timestamp)
+  if (article.savedAt) {
+    if (typeof article.savedAt.toMillis === "function") return article.savedAt.toMillis();
+    if (typeof article.savedAt.toDate === "function") return article.savedAt.toDate().getTime();
+    if (article.savedAt.seconds) return article.savedAt.seconds * 1000;
+    const d = new Date(article.savedAt);
+    if (!isNaN(d.getTime())) return d.getTime();
+  }
+
+  // 2. Read updatedAt (Firestore Timestamp)
+  if (article.updatedAt) {
+    if (typeof article.updatedAt.toMillis === "function") return article.updatedAt.toMillis();
+    if (typeof article.updatedAt.toDate === "function") return article.updatedAt.toDate().getTime();
+    if (article.updatedAt.seconds) return article.updatedAt.seconds * 1000;
+    const d = new Date(article.updatedAt);
+    if (!isNaN(d.getTime())) return d.getTime();
+  }
+
+  // 3. Fallback to publishedAt string
+  if (article.publishedAt) {
+    const d = new Date(article.publishedAt);
+    if (!isNaN(d.getTime())) return d.getTime();
+  }
+
+  return 0;
+}
+
+function formatDate(article) {
+  const timestamp = parseArticleDate(article);
+  if (!timestamp) return "";
+  const date = new Date(timestamp);
   return date.toLocaleDateString("en-IN", {
     day: "numeric",
     month: "long",
@@ -33,210 +55,201 @@ function formatDate(dateString) {
   });
 }
 
-function getGoogleDrivePreviewUrl(url) {
-  if (!url) return "";
-  const match =
-    url.match(/\/d\/([a-zA-Z0-9_-]+)/) ||
-    url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-
-  if (!match) return url;
-  return `https://drive.google.com/file/d/${match[1]}/preview`;
+function categoryName(category) {
+  if (!category) return "News";
+  return String(category)
+    .split("-")
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
 }
 
-/* =========================================
-   WHATSAPP & WEB SHARE INTEGRATION
-========================================= */
-function setupSharing(title, description) {
-  const whatsappBtn = document.getElementById("whatsappShareBtn");
-  const nativeBtn = document.getElementById("nativeShareBtn");
-
-  const currentUrl = window.location.href;
-  const shareText = `*${title}*\n\n${description ? description.slice(0, 100) + '...' : ''}\n\nRead more on New TN Politics: ${currentUrl}`;
-
-  if (whatsappBtn) {
-    whatsappBtn.onclick = () => {
-      const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`;
-      window.open(whatsappUrl, "_blank");
-    };
-  }
-
-  if (nativeBtn) {
-    nativeBtn.onclick = async () => {
-      if (navigator.share) {
-        try {
-          await navigator.share({
-            title: title,
-            text: description,
-            url: currentUrl
-          });
-        } catch (err) {
-          console.warn("Share cancelled or failed:", err);
-        }
-      } else {
-        navigator.clipboard.writeText(currentUrl);
-        alert("Article link copied to clipboard!");
-      }
-    };
-  }
+function getCategoryIcon(category) {
+  const value = String(category || "").toLowerCase();
+  if (value.includes("politics")) return "🏛️";
+  if (value.includes("sports")) return "🏏";
+  if (value.includes("technology")) return "💻";
+  if (value.includes("business")) return "💰";
+  if (value.includes("education")) return "🎓";
+  if (value.includes("world")) return "🌍";
+  if (value.includes("india")) return "🇮🇳";
+  if (value.includes("tamil")) return "📍";
+  return "📰";
 }
 
-/* =========================================
-   TEXT-TO-SPEECH (AUDIO READER)
-========================================= */
-let speechInstance = null;
+function createReaderLink(id) {
+  return `reader.html?type=automatic&id=${encodeURIComponent(id)}`;
+}
 
-function setupAudioReader(title, description) {
-  const audioBtn = document.getElementById("audioNewsBtn");
-  if (!audioBtn) return;
+async function trackArticleClick(articleId) {
+  if (!articleId) return;
+  try {
+    const articleRef = doc(db, "automaticNews", articleId);
+    await updateDoc(articleRef, { views: increment(1) });
+  } catch (error) {
+    console.warn("View tracking skipped:", error);
+  }
+}
+window.trackArticleClick = trackArticleClick;
 
-  if (!("speechSynthesis" in window)) {
-    audioBtn.style.display = "none";
+/* ================================
+   RENDER HOMEPAGE
+================================ */
+
+function displayNews(newsItems) {
+  const homeNewsTitle = document.getElementById("homeNewsTitle");
+  const homeNewsDescription = document.getElementById("homeNewsDescription");
+  const breakingNewsText = document.getElementById("breakingNewsText");
+  const previousNewsGrid = document.getElementById("previousNewsGrid");
+  const homeNewsDate = document.getElementById("homeNewsDate");
+  const homeNewsCategory = document.getElementById("homeNewsCategory");
+  const heroReadButton = document.getElementById("heroReadButton");
+  const homeReadButton = document.getElementById("homeReadButton");
+
+  if (!newsItems || newsItems.length === 0) {
+    if (homeNewsTitle) homeNewsTitle.textContent = "No automatic news available.";
+    if (previousNewsGrid) previousNewsGrid.innerHTML = "<p>No news available yet.</p>";
     return;
   }
 
-  audioBtn.onclick = () => {
-    if (window.speechSynthesis.speaking) {
-      window.speechSynthesis.cancel();
-      audioBtn.textContent = "🔊 Listen to News";
-      audioBtn.classList.remove("speaking");
+  const latest = newsItems[0];
+  const latestReaderLink = createReaderLink(latest.id);
+
+  /* Breaking News Header */
+  if (breakingNewsText) {
+    breakingNewsText.textContent = latest.title || "Latest news available now";
+    breakingNewsText.style.cursor = "pointer";
+    breakingNewsText.onclick = () => {
+      trackArticleClick(latest.id);
+      window.location.href = latestReaderLink;
+    };
+  }
+
+  /* Featured Hero News */
+  if (homeNewsDate) homeNewsDate.textContent = formatDate(latest);
+  if (homeNewsCategory) {
+    const districtTag = latest.district ? ` • 📍 ${latest.district}` : "";
+    homeNewsCategory.textContent = `${getCategoryIcon(latest.category)} ${categoryName(latest.category)}${districtTag}`;
+  }
+  if (homeNewsTitle) homeNewsTitle.textContent = latest.title || "Latest News";
+  if (homeNewsDescription) homeNewsDescription.textContent = latest.description || "Read the latest news.";
+
+  if (heroReadButton) {
+    heroReadButton.href = latestReaderLink;
+    heroReadButton.onclick = () => trackArticleClick(latest.id);
+  }
+  if (homeReadButton) {
+    homeReadButton.href = latestReaderLink;
+    homeReadButton.onclick = () => trackArticleClick(latest.id);
+  }
+
+  /* Grid Articles (Homepage Previous News) */
+  const previousNews = newsItems.slice(1);
+  if (!previousNewsGrid) return;
+
+  if (previousNews.length === 0) {
+    previousNewsGrid.innerHTML = "<p>No additional news available.</p>";
+    return;
+  }
+
+  previousNewsGrid.innerHTML = previousNews
+    .map(news => {
+      const readerLink = createReaderLink(news.id);
+      const districtTag = news.district ? ` • 📍 ${news.district}` : "";
+
+      return `
+        <article class="publication-item">
+          <div>
+            <p class="news-category">
+              ${getCategoryIcon(news.category)} ${categoryName(news.category)}${districtTag}
+            </p>
+            <strong>${news.title || "Latest News"}</strong>
+            <p>📅 ${formatDate(news)}</p>
+          </div>
+          <a class="read-button" href="${readerLink}" onclick="trackArticleClick('${news.id}')">
+            Read News
+          </a>
+        </article>
+      `;
+    })
+    .join("");
+}
+
+/* ================================
+   TRENDING NEWS
+================================ */
+
+function loadTrendingNews() {
+  const trendingGrid = document.getElementById("trendingNewsGrid");
+  if (!trendingGrid) return;
+
+  const trendingQuery = query(collection(db, "automaticNews"), limit(30));
+
+  onSnapshot(trendingQuery, snapshot => {
+    if (snapshot.empty) {
+      trendingGrid.innerHTML = "<p>No trending articles available yet.</p>";
       return;
     }
 
-    const textToRead = `${title}. ${description || ''}`;
-    speechInstance = new SpeechSynthesisUtterance(textToRead);
-    speechInstance.lang = "en-IN";
-    speechInstance.rate = 0.95;
+    let trendingItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-    speechInstance.onend = () => {
-      audioBtn.textContent = "🔊 Listen to News";
-      audioBtn.classList.remove("speaking");
-    };
+    trendingItems.sort((a, b) => {
+      const viewsA = Number(a.views || 0);
+      const viewsB = Number(b.views || 0);
+      if (viewsB !== viewsA) return viewsB - viewsA;
+      return parseArticleDate(b) - parseArticleDate(a);
+    });
 
-    speechInstance.onerror = () => {
-      audioBtn.textContent = "🔊 Listen to News";
-      audioBtn.classList.remove("speaking");
-    };
-
-    window.speechSynthesis.speak(speechInstance);
-    audioBtn.textContent = "⏹ Stop Listening";
-    audioBtn.classList.add("speaking");
-  };
+    trendingGrid.innerHTML = trendingItems.slice(0, 4).map((news, index) => {
+      const districtTag = news.district ? ` • 📍 ${news.district}` : "";
+      return `
+        <article class="trending-card">
+          <div>
+            <span class="trending-badge">#${index + 1} Most Read</span>
+            <p class="news-category">${getCategoryIcon(news.category)} ${categoryName(news.category)}${districtTag}</p>
+            <strong>${news.title || "Trending News"}</strong>
+          </div>
+          <a class="read-button" href="${createReaderLink(news.id)}" onclick="trackArticleClick('${news.id}')" style="margin-top: 15px;">Read News</a>
+        </article>
+      `;
+    }).join("");
+  }, err => {
+    console.error("Trending news error:", err);
+  });
 }
 
-/* =========================================
-   AUTOMATIC NEWS LOADER
-========================================= */
-async function loadAutomaticNews(newsId) {
-  const newsDocument = await getDoc(doc(db, "automaticNews", newsId));
+/* ================================
+   LOAD HOMEPAGE DATA
+================================ */
 
-  if (!newsDocument.exists()) {
-    throw new Error("Automatic news item not found");
+function loadHomeNews() {
+  const homeSectionDate = document.getElementById("homeSectionDate");
+  if (homeSectionDate) {
+    homeSectionDate.textContent = new Date().toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "long",
+      year: "numeric"
+    });
   }
 
-  const news = newsDocument.data();
+  loadTrendingNews();
 
-  if (readerTitle) readerTitle.textContent = news.title || "Latest News";
-  if (readerDate) readerDate.textContent = formatDate(news.publishedAt || news.savedAt);
+  const newsQuery = query(collection(db, "automaticNews"), limit(40));
 
-  if (readerPdf && readerPdf.parentElement) {
-    readerPdf.parentElement.style.display = "none";
-  }
+  onSnapshot(newsQuery, snapshot => {
+    if (snapshot.empty) {
+      displayNews([]);
+      return;
+    }
 
-  if (readerDownload) {
-    readerDownload.textContent = "↗ Open Original Source";
-    readerDownload.href = news.sourceUrl || "#";
-    readerDownload.target = "_blank";
-    readerDownload.style.display = news.sourceUrl ? "inline-flex" : "none";
-  }
+    let allFetchedItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-  let description = document.getElementById("readerDescription");
-  if (!description && readerHeading) {
-    description = document.createElement("div");
-    description.id = "readerDescription";
-    description.className = "reader-description";
-    readerHeading.appendChild(description);
-  }
-  if (description) {
-    description.textContent = news.description || "Read the latest update from New TN Politics.";
-  }
+    // Sort strictly by Firestore timestamp (savedAt / updatedAt) - newest first
+    allFetchedItems.sort((a, b) => parseArticleDate(b) - parseArticleDate(a));
 
-  setupSharing(news.title || "Latest News", news.description || "");
-  setupAudioReader(news.title || "Latest News", news.description || "");
+    displayNews(allFetchedItems);
+  }, err => {
+    console.error("Main news query error:", err);
+  });
 }
 
-/* =========================================
-   PDF NEWS LOADER
-========================================= */
-async function loadPdfNews(newsId) {
-  let news;
-
-  if (newsId) {
-    const newsDocument = await getDoc(doc(db, "news", newsId));
-    if (!newsDocument.exists()) {
-      throw new Error("PDF News not found");
-    }
-    news = newsDocument.data();
-  } else {
-    const latestNews = await getDocs(
-      query(
-        collection(db, "news"),
-        orderBy("publicationDate", "desc"),
-        limit(1)
-      )
-    );
-
-    if (latestNews.empty) {
-      throw new Error("No PDF news published yet");
-    }
-    news = latestNews.docs[0].data();
-  }
-
-  if (readerTitle) readerTitle.textContent = news.title || "Daily News PDF";
-  if (readerDate) readerDate.textContent = formatDate(news.publicationDate);
-
-  if (readerPdf) {
-    if (readerPdf.parentElement) readerPdf.parentElement.style.display = "block";
-    readerPdf.style.display = "block";
-    readerPdf.src = getGoogleDrivePreviewUrl(news.pdfUrl);
-  }
-
-  if (readerDownload) {
-    readerDownload.textContent = "↓ Download PDF";
-    readerDownload.href = news.pdfUrl || "#";
-    readerDownload.target = "_blank";
-    readerDownload.style.display = news.pdfUrl ? "inline-flex" : "none";
-  }
-
-  setupSharing(news.title || "Daily News PDF", news.description || "");
-  setupAudioReader(news.title || "Daily News PDF", news.description || "");
-}
-
-/* =========================================
-   MAIN ROUTER
-========================================= */
-async function loadNews() {
-  try {
-    const urlParams = new URLSearchParams(window.location.search);
-    const newsId = urlParams.get("id");
-    const newsType = urlParams.get("type");
-
-    if (newsType === "automatic" && newsId) {
-      await loadAutomaticNews(newsId);
-    } else {
-      await loadPdfNews(newsId);
-    }
-  } catch (error) {
-    console.error("Reader Error:", error);
-    if (readerTitle) readerTitle.textContent = "News article is unavailable";
-    if (readerDate) readerDate.textContent = "Please return to the homepage or try again later.";
-
-    if (readerPdf && readerPdf.parentElement) {
-      readerPdf.parentElement.style.display = "none";
-    }
-    if (readerDownload) {
-      readerDownload.style.display = "none";
-    }
-  }
-}
-
-loadNews();
+loadHomeNews();

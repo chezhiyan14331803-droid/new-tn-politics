@@ -12,22 +12,11 @@ import { db } from "./firebase-config.js";
    ELEMENTS
 ========================================= */
 
-const archiveGrid =
-  document.getElementById("archiveGrid");
-
-const archiveCategory =
-  document.getElementById("archiveCategory");
-
-const archiveDistrict =
-  document.getElementById("archiveDistrict");
-
-const archiveHeading =
-  document.querySelector(".archive-heading h1");
-
-const archiveDescription =
-  document.querySelector(
-    ".archive-heading > p:last-child"
-  );
+const archiveGrid = document.getElementById("archiveGrid");
+const archiveCategory = document.getElementById("archiveCategory");
+const archiveDistrict = document.getElementById("archiveDistrict");
+const archiveHeading = document.querySelector(".archive-heading h1");
+const archiveDescription = document.querySelector(".archive-heading > p:last-child");
 
 
 /* =========================================
@@ -50,28 +39,40 @@ function normalizeText(text) {
 
 
 /* =========================================
+   PARSE ARTICLE TIMESTAMP
+========================================= */
+
+function parseArticleDate(item) {
+  if (!item) return 0;
+
+  // 1. Check raw Firestore objects first (updatedAt, savedAt, publicationDate, publishedAt)
+  const rawDate = item.updatedAt || item.savedAt || item.publicationDate || item.publishedAt || item.date;
+
+  if (rawDate) {
+    if (typeof rawDate.toMillis === "function") return rawDate.toMillis();
+    if (typeof rawDate.toDate === "function") return rawDate.toDate().getTime();
+    const parsed = new Date(rawDate);
+    if (!isNaN(parsed.getTime())) return parsed.getTime();
+  }
+
+  return 0;
+}
+
+
+/* =========================================
    FORMAT DATE
 ========================================= */
 
-function formatDate(dateString) {
-  if (!dateString) {
-    return "";
-  }
+function formatDate(item) {
+  const timestamp = parseArticleDate(item);
+  if (!timestamp) return "";
 
-  const date = new Date(dateString);
-
-  if (isNaN(date.getTime())) {
-    return dateString;
-  }
-
-  return date.toLocaleDateString(
-    "en-IN",
-    {
-      day: "numeric",
-      month: "long",
-      year: "numeric"
-    }
-  );
+  const date = new Date(timestamp);
+  return date.toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "long",
+    year: "numeric"
+  });
 }
 
 
@@ -80,16 +81,11 @@ function formatDate(dateString) {
 ========================================= */
 
 function categoryName(category) {
-  if (!category) {
-    return "News";
-  }
+  if (!category) return "News";
 
   return String(category)
     .split(/[\s_-]+/)
-    .map(word =>
-      word.charAt(0).toUpperCase() +
-      word.slice(1)
-    )
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
 }
 
@@ -237,7 +233,7 @@ function renderNews() {
 
             <div class="news-meta">
               <span>
-                📅 ${formatDate(news.date)}
+                📅 ${formatDate(news)}
               </span>
 
               ${
@@ -281,10 +277,7 @@ function renderNews() {
 
 async function loadAutomaticNews() {
   const results = await getDocs(
-    query(
-      collection(db, "automaticNews"),
-      orderBy("publishedAt", "desc")
-    )
+    query(collection(db, "automaticNews"))
   );
 
   return results.docs.map(newsDocument => {
@@ -297,7 +290,9 @@ async function loadAutomaticNews() {
       category: data.category || "",
       district: data.district || "General",
       description: data.description || "",
-      date: data.publishedAt || "",
+      updatedAt: data.updatedAt,
+      savedAt: data.savedAt,
+      publishedAt: data.publishedAt || "",
       source: data.source || "",
       sourceUrl: data.sourceUrl || ""
     };
@@ -311,10 +306,7 @@ async function loadAutomaticNews() {
 
 async function loadPdfNews() {
   const results = await getDocs(
-    query(
-      collection(db, "news"),
-      orderBy("publicationDate", "desc")
-    )
+    query(collection(db, "news"))
   );
 
   return results.docs.map(newsDocument => {
@@ -327,7 +319,7 @@ async function loadPdfNews() {
       category: data.category || "",
       district: data.district || "General",
       description: data.description || "",
-      date: data.publicationDate || "",
+      publicationDate: data.publicationDate || "",
       pdfUrl: data.pdfUrl || ""
     };
   });
@@ -347,8 +339,8 @@ async function loadArchive() {
 
     allNews = [...automaticNews, ...pdfNews];
 
-    /* NEWEST FIRST */
-    allNews.sort((a, b) => new Date(b.date) - new Date(a.date));
+    /* STRICT SORTING BY FETCH TIMESTAMP (NEWEST FIRST) */
+    allNews.sort((a, b) => parseArticleDate(b) - parseArticleDate(a));
 
     /* SET CATEGORY FROM URL */
     const requestedCategory = getRequestedCategory();
