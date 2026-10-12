@@ -1,22 +1,25 @@
 {
-  "name": "Daily News Updates",
-  "short_name": "Daily News",
-  "description": "Daily Tamil Nadu political and district news updates.",
+  "name": "DAILY NEWS UPDATES",
+  "short_name": "TN News",
+  "description": "Daily Tamil Nadu, India, World, and Political News Updates",
   "start_url": "/index.html",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#e11d48",
   "orientation": "portrait",
+  "background_color": "#151515",
+  "theme_color": "#151515",
   "icons": [
     {
-      "src": "logo.png",
+      "src": "/logo.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     },
     {
-      "src": "logo.png",
+      "src": "/logo.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }
