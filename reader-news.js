@@ -67,6 +67,34 @@ function formatDate(data) {
     return "";
   }
 }
+/* =========================================
+   DYNAMIC OPEN GRAPH META TAG UPDATER
+========================================= */
+
+function updateSocialMetaTags(title, description, imageUrl, articleUrl) {
+  // Page Title
+  document.title = `${title} | Daily News Updates`;
+
+  // OpenGraph Meta Elements
+  const ogTitle = document.getElementById("ogTitle") || document.querySelector('meta[property="og:title"]');
+  const ogDesc = document.getElementById("ogDescription") || document.querySelector('meta[property="og:description"]');
+  const ogImg = document.getElementById("ogImage") || document.querySelector('meta[property="og:image"]');
+  const ogUrl = document.getElementById("ogUrl") || document.querySelector('meta[property="og:url"]');
+
+  if (ogTitle) ogTitle.setAttribute("content", title);
+  if (ogDesc) ogDesc.setAttribute("content", description || "Read the latest news update.");
+  if (ogImg && imageUrl) ogImg.setAttribute("content", imageUrl);
+  if (ogUrl) ogUrl.setAttribute("content", articleUrl);
+
+  // Twitter Meta Elements
+  const twTitle = document.getElementById("twTitle") || document.querySelector('meta[name="twitter:title"]');
+  const twDesc = document.getElementById("twDescription") || document.querySelector('meta[name="twitter:description"]');
+  const twImg = document.getElementById("twImage") || document.querySelector('meta[name="twitter:image"]');
+
+  if (twTitle) twTitle.setAttribute("content", title);
+  if (twDesc) twDesc.setAttribute("content", description || "Read the latest news update.");
+  if (twImg && imageUrl) twImg.setAttribute("content", imageUrl);
+}
 
 /* =========================================
    BUTTON ACTIONS & EVENT LISTENERS
@@ -173,8 +201,15 @@ async function loadArticle() {
     }
 
     const data = docSnap.data();
-    currentArticleTitle = data.title || "Untitled Article";
-    currentArticleText = data.description || data.content || data.body || "";
+    // Inside loadArticle() in reader-news.js, right after `const data = docSnap.data();`:
+
+const currentArticleTitle = data.title || "Untitled Article";
+const currentArticleText = data.description || data.content || "";
+const currentImageUrl = data.imageUrl || "https://new-tn-politics.web.app/logo.png";
+const currentArticleUrl = window.location.href;
+
+// Update Social Meta Tags
+updateSocialMetaTags(currentArticleTitle, currentArticleText, currentImageUrl, currentArticleUrl);
 
     // 1. Title
     if (readerTitle) {
