@@ -1,70 +1,58 @@
 import {
   collection,
-  getDocs,
+  query,
   orderBy,
-  query
+  limit,
+  startAfter,
+  getDocs,
+  doc,
+  increment,
+  updateDoc
 } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js";
 
 import { db } from "./firebase-config.js";
 
+/* =========================================
+   GLOBAL ARCHIVE STATE
+========================================= */
+const PAGE_SIZE = 12;
+let lastVisibleDoc = null;
+let isLoading = false;
+let currentCategoryFilter = "ALL";
 
 /* =========================================
-   ELEMENTS
+   DATE PARSING HELPERS
 ========================================= */
 
-const archiveGrid = document.getElementById("archiveGrid");
-const archiveCategory = document.getElementById("archiveCategory");
-const archiveDistrict = document.getElementById("archiveDistrict");
-const archiveHeading = document.querySelector(".archive-heading h1");
-const archiveDescription = document.querySelector(".archive-heading > p:last-child");
+function parseArticleDate(article) {
+  if (!article) return 0;
 
+  if (article.updatedAt) {
+    if (typeof article.updatedAt.toMillis === "function") return article.updatedAt.toMillis();
+    if (typeof article.updatedAt.toDate === "function") return article.updatedAt.toDate().getTime();
+    if (article.updatedAt.seconds) return article.updatedAt.seconds * 1000;
+    const d = new Date(article.updatedAt);
+    if (!isNaN(d.getTime())) return d.getTime();
+  }
 
-/* =========================================
-   ALL NEWS
-========================================= */
+  if (article.savedAt) {
+    if (typeof article.savedAt.toMillis === "function") return article.savedAt.toMillis();
+    if (typeof article.savedAt.toDate === "function") return article.savedAt.toDate().getTime();
+    if (article.savedAt.seconds) return article.savedAt.seconds * 1000;
+    const d = new Date(article.savedAt);
+    if (!isNaN(d.getTime())) return d.getTime();
+  }
 
-let allNews = [];
-
-
-/* =========================================
-   NORMALIZE STRING
-========================================= */
-
-function normalizeText(text) {
-  return String(text || "")
-    .trim()
-    .toLowerCase()
-    .replace(/[\s_-]+/g, "-");
-}
-
-
-/* =========================================
-   PARSE ARTICLE TIMESTAMP
-========================================= */
-
-function parseArticleDate(item) {
-  if (!item) return 0;
-
-  // 1. Check raw Firestore objects first (updatedAt, savedAt, publicationDate, publishedAt)
-  const rawDate = item.updatedAt || item.savedAt || item.publicationDate || item.publishedAt || item.date;
-
-  if (rawDate) {
-    if (typeof rawDate.toMillis === "function") return rawDate.toMillis();
-    if (typeof rawDate.toDate === "function") return rawDate.toDate().getTime();
-    const parsed = new Date(rawDate);
-    if (!isNaN(parsed.getTime())) return parsed.getTime();
+  if (article.publishedAt) {
+    const d = new Date(article.publishedAt);
+    if (!isNaN(d.getTime())) return d.getTime();
   }
 
   return 0;
 }
 
-
-/* =========================================
-   FORMAT DATE
-========================================= */
-
-function formatDate(item) {
-  const timestamp = parseArticleDate(item);
+function formatDate(article) {
+  const timestamp = parseArticleDate(article);
   if (!timestamp) return "";
 
   const date = new Date(timestamp);
@@ -75,28 +63,16 @@ function formatDate(item) {
   });
 }
 
-
-/* =========================================
-   CATEGORY DISPLAY NAME
-========================================= */
-
 function categoryName(category) {
   if (!category) return "News";
-
   return String(category)
-    .split(/[\s_-]+/)
+    .split("-")
     .map(word => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
 }
 
-
-/* =========================================
-   CATEGORY ICON
-========================================= */
-
 function getCategoryIcon(category) {
   const value = String(category || "").toLowerCase();
-
   if (value.includes("politics")) return "🏛️";
   if (value.includes("sports")) return "🏏";
   if (value.includes("technology")) return "💻";
@@ -105,293 +81,137 @@ function getCategoryIcon(category) {
   if (value.includes("world")) return "🌍";
   if (value.includes("india")) return "🇮🇳";
   if (value.includes("tamil")) return "📍";
-
   return "📰";
 }
 
-
-/* =========================================
-   GET URL SEARCH & PARAMS
-========================================= */
-
-function getSearchText() {
-  return new URLSearchParams(window.location.search)
-    .get("search")
-    ?.trim()
-    .toLowerCase()
-    .replace(/[\s_-]+/g, "") || "";
+function createReaderLink(id, type = "automatic") {
+  return `reader.html?type=${encodeURIComponent(type)}&id=${encodeURIComponent(id)}`;
 }
 
-function getRequestedCategory() {
-  return new URLSearchParams(window.location.search).get("category") || "";
+async function trackArticleClick(articleId) {
+  if (!articleId) return;
+  try {
+    const articleRef = doc(db, "automaticNews", articleId);
+    await updateDoc(articleRef, { views: increment(1) });
+  } catch (error) {
+    console.warn("View tracking skipped:", error);
+  }
 }
-
+window.trackArticleClick = trackArticleClick;
 
 /* =========================================
-   UPDATE PAGE HEADING
+   PAGINATED ARCHIVE LOADER
 ========================================= */
 
-function updateArchiveHeading(searchText, selectedCategory, selectedDistrict) {
-  if (!archiveHeading || !archiveDescription) return;
+async function loadArchiveNews(isNextBatch = false) {
+  if (isLoading) return;
 
-  if (searchText) {
-    archiveHeading.textContent = "Search Results";
-    archiveDescription.textContent = `Showing results for "${searchText}"`;
-    return;
-  }
+  const archiveGrid = document.getElementById("archiveGrid") || document.getElementById("previousNewsGrid");
+  const loadMoreBtn = document.getElementById("loadMoreBtn");
 
-  if (selectedDistrict && selectedDistrict !== "all") {
-    archiveHeading.textContent = `${selectedDistrict} News`;
-    archiveDescription.textContent = `Browse news published from ${selectedDistrict}.`;
-    return;
-  }
-
-  if (selectedCategory && selectedCategory !== "all") {
-    archiveHeading.textContent = `${categoryName(selectedCategory)} News`;
-    archiveDescription.textContent = `Browse the latest ${categoryName(selectedCategory).toLowerCase()} news.`;
-    return;
-  }
-
-  archiveHeading.textContent = "Previous News";
-  archiveDescription.textContent = "Browse previously published daily news.";
-}
-
-
-/* =========================================
-   RENDER NEWS
-========================================= */
-
-function renderNews() {
   if (!archiveGrid) return;
 
-  const selectedCategory = normalizeText(archiveCategory ? archiveCategory.value : "all");
-  const selectedDistrict = normalizeText(archiveDistrict ? archiveDistrict.value : "all");
-  const searchText = getSearchText();
-
-  updateArchiveHeading(searchText, selectedCategory, selectedDistrict);
-
-  /* FILTER BY CATEGORY & DISTRICT */
-  let newsToShow = allNews.filter(news => {
-    const newsCategory = normalizeText(news.category);
-    const newsDistrict = normalizeText(news.district || "general");
-
-    const categoryMatches = (selectedCategory === "all" || selectedCategory === "" || newsCategory === selectedCategory);
-    const districtMatches = (selectedDistrict === "all" || selectedDistrict === "" || newsDistrict === selectedDistrict);
-
-    return categoryMatches && districtMatches;
-  });
-
-  /* FILTER BY SEARCH TEXT */
-  if (searchText) {
-    newsToShow = newsToShow.filter(news => {
-      const searchableText = `
-        ${news.title || ""}
-        ${news.category || ""}
-        ${news.district || ""}
-        ${news.description || ""}
-        ${news.source || ""}
-      `
-        .toLowerCase()
-        .replace(/[\s_-]+/g, "");
-
-      return searchableText.includes(searchText);
-    });
+  isLoading = true;
+  if (loadMoreBtn) {
+    loadMoreBtn.textContent = "Loading articles...";
+    loadMoreBtn.disabled = true;
   }
 
-  /* RENDER EMPTY STATE */
-  if (newsToShow.length === 0) {
-    archiveGrid.innerHTML = `
-      <div class="archive-empty">
-        <h3>No News Found</h3>
-        <p>No articles match your selected filters. Try changing your category or district selection.</p>
-      </div>
-    `;
-    return;
-  }
+  try {
+    let archiveQuery;
 
-  /* DISPLAY NEWS CARDS */
-  archiveGrid.innerHTML = newsToShow
-    .map(news => {
-      const readerLink = news.type === "automatic"
-        ? `reader.html?type=automatic&id=${encodeURIComponent(news.id)}`
-        : `reader.html?id=${encodeURIComponent(news.id)}`;
+    if (isNextBatch && lastVisibleDoc) {
+      archiveQuery = query(
+        collection(db, "automaticNews"),
+        orderBy("savedAt", "desc"),
+        startAfter(lastVisibleDoc),
+        limit(PAGE_SIZE)
+      );
+    } else {
+      archiveQuery = query(
+        collection(db, "automaticNews"),
+        orderBy("savedAt", "desc"),
+        limit(PAGE_SIZE)
+      );
+    }
 
-      const buttonText = news.type === "automatic" ? "Read News" : "Read PDF";
+    const snapshot = await getDocs(archiveQuery);
+
+    if (snapshot.empty) {
+      if (!isNextBatch) {
+        archiveGrid.innerHTML = `<p style="padding: 20px; color: #64748b;">No archived articles found.</p>`;
+      }
+      if (loadMoreBtn) {
+        loadMoreBtn.style.display = "none";
+      }
+      isLoading = false;
+      return;
+    }
+
+    lastVisibleDoc = snapshot.docs[snapshot.docs.length - 1];
+
+    let newsItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    newsItems.sort((a, b) => parseArticleDate(b) - parseArticleDate(a));
+
+    const htmlCards = newsItems.map(news => {
+      const type = news.type || "automatic";
+      const readerLink = createReaderLink(news.id, type);
+      const districtTag = news.district ? ` • 📍 ${news.district}` : "";
 
       return `
         <article class="publication-item">
           <div>
             <p class="news-category">
-              ${getCategoryIcon(news.category)}
-              ${categoryName(news.category)}
-              ${news.district ? ` • 📍 ${news.district}` : ""}
+              ${getCategoryIcon(news.category)} ${categoryName(news.category)}${districtTag}
             </p>
-
-            <strong>
-              ${news.title || "Latest News"}
-            </strong>
-
-            <div class="news-meta">
-              <span>
-                📅 ${formatDate(news)}
-              </span>
-
-              ${
-                news.source
-                  ? `
-                    <span>
-                      📰 ${news.source}
-                    </span>
-                  `
-                  : ""
-              }
-            </div>
-
-            ${
-              news.description
-                ? `
-                  <p>
-                    ${news.description}
-                  </p>
-                `
-                : ""
-            }
+            <strong>${news.title || "Archived News"}</strong>
+            <p>📅 ${formatDate(news)}</p>
           </div>
-
-          <a
-            class="read-button"
-            href="${readerLink}"
-          >
-            ${buttonText}
+          <a class="read-button" href="${readerLink}" onclick="trackArticleClick('${news.id}')">
+            Read News
           </a>
         </article>
       `;
-    })
-    .join("");
-}
+    }).join("");
 
+    if (isNextBatch) {
+      archiveGrid.insertAdjacentHTML("beforeend", htmlCards);
+    } else {
+      archiveGrid.innerHTML = htmlCards;
+    }
 
-/* =========================================
-   LOAD AUTOMATIC NEWS
-========================================= */
-
-async function loadAutomaticNews() {
-  const results = await getDocs(
-    query(collection(db, "automaticNews"))
-  );
-
-  return results.docs.map(newsDocument => {
-    const data = newsDocument.data();
-
-    return {
-      id: newsDocument.id,
-      type: "automatic",
-      title: data.title || "",
-      category: data.category || "",
-      district: data.district || "General",
-      description: data.description || "",
-      updatedAt: data.updatedAt,
-      savedAt: data.savedAt,
-      publishedAt: data.publishedAt || "",
-      source: data.source || "",
-      sourceUrl: data.sourceUrl || ""
-    };
-  });
-}
-
-
-/* =========================================
-   LOAD PDF NEWS
-========================================= */
-
-async function loadPdfNews() {
-  const results = await getDocs(
-    query(collection(db, "news"))
-  );
-
-  return results.docs.map(newsDocument => {
-    const data = newsDocument.data();
-
-    return {
-      id: newsDocument.id,
-      type: "pdf",
-      title: data.title || "",
-      category: data.category || "",
-      district: data.district || "General",
-      description: data.description || "",
-      publicationDate: data.publicationDate || "",
-      pdfUrl: data.pdfUrl || ""
-    };
-  });
-}
-
-
-/* =========================================
-   LOAD BOTH COLLECTIONS
-========================================= */
-
-async function loadArchive() {
-  try {
-    const [automaticNews, pdfNews] = await Promise.all([
-      loadAutomaticNews(),
-      loadPdfNews()
-    ]);
-
-    allNews = [...automaticNews, ...pdfNews];
-
-    /* STRICT SORTING BY FETCH TIMESTAMP (NEWEST FIRST) */
-    allNews.sort((a, b) => parseArticleDate(b) - parseArticleDate(a));
-
-    /* SET CATEGORY FROM URL */
-    const requestedCategory = getRequestedCategory();
-
-    if (requestedCategory && archiveCategory) {
-      const requested = normalizeText(requestedCategory);
-      const matchingOption = [...archiveCategory.options].find(option => {
-        return (
-          normalizeText(option.value) === requested ||
-          normalizeText(option.textContent) === requested
-        );
-      });
-
-      if (matchingOption) {
-        archiveCategory.value = matchingOption.value;
+    // Toggle Load More button visibility based on fetched item count
+    if (loadMoreBtn) {
+      if (snapshot.docs.length < PAGE_SIZE) {
+        loadMoreBtn.style.display = "none";
+      } else {
+        loadMoreBtn.style.display = "inline-block";
+        loadMoreBtn.textContent = "Load More News ↓";
+        loadMoreBtn.disabled = false;
       }
     }
 
-    /* DISPLAY */
-    renderNews();
-
   } catch (error) {
-    console.error("Archive error:", error);
-
-    if (archiveGrid) {
-      archiveGrid.innerHTML = `
-        <div class="archive-empty">
-          <h3>Unable to Load News</h3>
-          <p>Please try again later.</p>
-        </div>
-      `;
+    console.warn("Archive pagination fallback:", error);
+    if (loadMoreBtn) {
+      loadMoreBtn.style.display = "none";
     }
+  } finally {
+    isLoading = false;
   }
 }
 
-
 /* =========================================
-   LISTENERS
+   INITIALIZE & EVENT LISTENERS
 ========================================= */
 
-if (archiveCategory) {
-  archiveCategory.addEventListener("change", renderNews);
-}
+document.addEventListener("DOMContentLoaded", () => {
+  loadArchiveNews(false);
 
-if (archiveDistrict) {
-  archiveDistrict.addEventListener("change", renderNews);
-}
-
-
-/* =========================================
-   START
-========================================= */
-
-loadArchive();
+  const loadMoreBtn = document.getElementById("loadMoreBtn");
+  if (loadMoreBtn) {
+    loadMoreBtn.addEventListener("click", () => {
+      loadArchiveNews(true);
+    });
+  }
+});
