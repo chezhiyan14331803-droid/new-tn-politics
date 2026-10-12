@@ -22,7 +22,67 @@ function openSearch() {
         }, 100);
     }
 }
+/* =========================================
+   ENHANCED REAL-TIME SEARCH & HOT TOPICS
+========================================= */
 
+function openSearch() {
+  const searchPopup = document.getElementById("searchPopup");
+  if (searchPopup) {
+    searchPopup.style.display = "flex";
+    const searchInput = document.getElementById("searchInput");
+    if (searchInput) {
+      searchInput.focus();
+      setupRealtimeSearch();
+    }
+  }
+}
+
+function closeSearch() {
+  const searchPopup = document.getElementById("searchPopup");
+  if (searchPopup) {
+    searchPopup.style.display = "none";
+  }
+}
+
+function quickSearch(topic) {
+  const searchInput = document.getElementById("searchInput");
+  if (searchInput) {
+    searchInput.value = topic;
+    searchNews();
+  }
+}
+
+function setupRealtimeSearch() {
+  const searchInput = document.getElementById("searchInput");
+  if (!searchInput || searchInput.dataset.listenerAdded) return;
+
+  searchInput.dataset.listenerAdded = "true";
+
+  // Trigger search dynamically while typing
+  searchInput.addEventListener("input", () => {
+    searchNews();
+  });
+}
+
+function searchNews() {
+  const searchInput = document.getElementById("searchInput");
+  if (!searchInput) return;
+
+  const query = searchInput.value.toLowerCase().trim();
+  const articles = document.querySelectorAll(".publication-item, .trending-card");
+
+  articles.forEach(article => {
+    const title = article.querySelector("strong")?.textContent.toLowerCase() || "";
+    const category = article.querySelector(".news-category")?.textContent.toLowerCase() || "";
+
+    if (!query || title.includes(query) || category.includes(query)) {
+      article.style.display = "";
+    } else {
+      article.style.display = "none";
+    }
+  });
+}
 
 function closeSearch() {
 

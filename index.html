@@ -257,19 +257,27 @@
         </p>
     </footer>
 
-    <!-- Search Popup -->
-    <div class="search-popup" id="searchPopup">
-        <div class="search-box">
-            <button class="close-search" onclick="closeSearch()">×</button>
-            <button class="theme-button" id="themeButton" onclick="toggleDarkMode()" aria-label="Toggle dark mode">🌙</button>
+   <!-- Search Popup -->
+<div class="search-popup" id="searchPopup">
+    <div class="search-box">
+        <button class="close-search" onclick="closeSearch()">×</button>
 
-            <h2>Search News</h2>
+        <h2>Search News</h2>
 
-            <input type="text" placeholder="Search for news..." id="searchInput">
+        <input type="text" placeholder="Search for news, topics, districts..." id="searchInput">
 
-            <button onclick="searchNews()">Search</button>
+        <!-- Quick Trending Search Pills -->
+        <div class="quick-topics" style="margin: 15px 0; display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;">
+            <span style="font-size: 0.85rem; color: #666; width: 100%;">Popular Searches:</span>
+            <button type="button" onclick="quickSearch('Politics')" style="padding: 4px 10px; font-size: 0.8rem; border-radius: 12px; border: 1px solid #ccc; background: #f0f0f0; cursor: pointer;">🏛️ Politics</button>
+            <button type="button" onclick="quickSearch('Tamil')" style="padding: 4px 10px; font-size: 0.8rem; border-radius: 12px; border: 1px solid #ccc; background: #f0f0f0; cursor: pointer;">📍 Tamil Nadu</button>
+            <button type="button" onclick="quickSearch('Business')" style="padding: 4px 10px; font-size: 0.8rem; border-radius: 12px; border: 1px solid #ccc; background: #f0f0f0; cursor: pointer;">💰 Business</button>
+            <button type="button" onclick="quickSearch('Sports')" style="padding: 4px 10px; font-size: 0.8rem; border-radius: 12px; border: 1px solid #ccc; background: #f0f0f0; cursor: pointer;">🏏 Sports</button>
         </div>
+
+        <button onclick="searchNews()">Search</button>
     </div>
+</div>
 
     <!-- Scripts -->
     <script src="script.js"></script>
