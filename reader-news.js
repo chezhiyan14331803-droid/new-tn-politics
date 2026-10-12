@@ -67,6 +67,7 @@ function formatDate(data) {
     return "";
   }
 }
+
 /* =========================================
    DYNAMIC OPEN GRAPH META TAG UPDATER
 ========================================= */
@@ -201,20 +202,19 @@ async function loadArticle() {
     }
 
     const data = docSnap.data();
-    // Inside loadArticle() in reader-news.js, right after `const data = docSnap.data();`:
 
-const currentArticleTitle = data.title || "Untitled Article";
-const currentArticleText = data.description || data.content || "";
-const currentImageUrl = data.imageUrl || "https://new-tn-politics.web.app/logo.png";
-const currentArticleUrl = window.location.href;
+    // Assign module-scoped variables
+    currentArticleTitle = data.title || "Untitled Article";
+    currentArticleText = data.description || data.content || data.body || "";
+    const currentImageUrl = data.imageUrl || "https://new-tn-politics.web.app/logo.png";
+    const currentArticleUrl = window.location.href;
 
-// Update Social Meta Tags
-updateSocialMetaTags(currentArticleTitle, currentArticleText, currentImageUrl, currentArticleUrl);
+    // Update Social OpenGraph & Twitter Meta Tags
+    updateSocialMetaTags(currentArticleTitle, currentArticleText, currentImageUrl, currentArticleUrl);
 
     // 1. Title
     if (readerTitle) {
       readerTitle.textContent = currentArticleTitle;
-      document.title = `${currentArticleTitle} | Daily News`;
     }
 
     // 2. Date & Source Meta
