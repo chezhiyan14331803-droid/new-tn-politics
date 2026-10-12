@@ -1,9 +1,7 @@
 import {
   collection,
   query,
-  orderBy,
   limit,
-  startAfter,
   getDocs,
   doc,
   increment,
@@ -16,9 +14,9 @@ import { db } from "./firebase-config.js";
    GLOBAL ARCHIVE STATE
 ========================================= */
 const PAGE_SIZE = 12;
-let lastVisibleDoc = null;
-let isLoading = false;
-let currentCategoryFilter = "ALL";
+let allNewsItems = []; // FIXED: Variable name aligned with applyFilters and fetchArchiveData
+let displayedCount = 0;
+let filteredArticles = [];
 
 /* =========================================
    DATE PARSING HELPERS
@@ -100,118 +98,139 @@ async function trackArticleClick(articleId) {
 window.trackArticleClick = trackArticleClick;
 
 /* =========================================
-   PAGINATED ARCHIVE LOADER
+   RENDER ARCHIVE GRID
 ========================================= */
 
-async function loadArchiveNews(isNextBatch = false) {
-  if (isLoading) return;
-
-  const archiveGrid = document.getElementById("archiveGrid") || document.getElementById("previousNewsGrid");
+function renderBatch() {
+  const archiveGrid = document.getElementById("archiveGrid");
   const loadMoreBtn = document.getElementById("loadMoreBtn");
 
   if (!archiveGrid) return;
 
-  isLoading = true;
-  if (loadMoreBtn) {
-    loadMoreBtn.textContent = "Loading articles...";
-    loadMoreBtn.disabled = true;
+  if (filteredArticles.length === 0) {
+    archiveGrid.innerHTML = `<p style="padding: 30px; text-align: center; color: #64748b; grid-column: 1/-1;">No archived articles match your selected filters.</p>`;
+    if (loadMoreBtn) loadMoreBtn.style.display = "none";
+    return;
   }
 
-  try {
-    let archiveQuery;
+  const batch = filteredArticles.slice(displayedCount, displayedCount + PAGE_SIZE);
+  
+  const htmlCards = batch.map(news => {
+    const type = news.type || "automatic";
+    const readerLink = createReaderLink(news.id, type);
+    const districtTag = news.district ? ` • 📍 ${news.district}` : "";
 
-    if (isNextBatch && lastVisibleDoc) {
-      archiveQuery = query(
-        collection(db, "automaticNews"),
-        orderBy("savedAt", "desc"),
-        startAfter(lastVisibleDoc),
-        limit(PAGE_SIZE)
-      );
+    return `
+      <article class="publication-item">
+        <div>
+          <p class="news-category">
+            ${getCategoryIcon(news.category)} ${categoryName(news.category)}${districtTag}
+          </p>
+          <strong>${news.title || "Archived News"}</strong>
+          <p>📅 ${formatDate(news)}</p>
+        </div>
+        <a class="read-button" href="${readerLink}" onclick="trackArticleClick('${news.id}')">
+          Read News
+        </a>
+      </article>
+    `;
+  }).join("");
+
+  if (displayedCount === 0) {
+    archiveGrid.innerHTML = htmlCards;
+  } else {
+    archiveGrid.insertAdjacentHTML("beforeend", htmlCards);
+  }
+
+  displayedCount += batch.length;
+
+  if (loadMoreBtn) {
+    if (displayedCount < filteredArticles.length) {
+      loadMoreBtn.style.display = "inline-block";
+      loadMoreBtn.textContent = "Load More News ↓";
     } else {
-      archiveQuery = query(
-        collection(db, "automaticNews"),
-        orderBy("savedAt", "desc"),
-        limit(PAGE_SIZE)
-      );
-    }
-
-    const snapshot = await getDocs(archiveQuery);
-
-    if (snapshot.empty) {
-      if (!isNextBatch) {
-        archiveGrid.innerHTML = `<p style="padding: 20px; color: #64748b;">No archived articles found.</p>`;
-      }
-      if (loadMoreBtn) {
-        loadMoreBtn.style.display = "none";
-      }
-      isLoading = false;
-      return;
-    }
-
-    lastVisibleDoc = snapshot.docs[snapshot.docs.length - 1];
-
-    let newsItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    newsItems.sort((a, b) => parseArticleDate(b) - parseArticleDate(a));
-
-    const htmlCards = newsItems.map(news => {
-      const type = news.type || "automatic";
-      const readerLink = createReaderLink(news.id, type);
-      const districtTag = news.district ? ` • 📍 ${news.district}` : "";
-
-      return `
-        <article class="publication-item">
-          <div>
-            <p class="news-category">
-              ${getCategoryIcon(news.category)} ${categoryName(news.category)}${districtTag}
-            </p>
-            <strong>${news.title || "Archived News"}</strong>
-            <p>📅 ${formatDate(news)}</p>
-          </div>
-          <a class="read-button" href="${readerLink}" onclick="trackArticleClick('${news.id}')">
-            Read News
-          </a>
-        </article>
-      `;
-    }).join("");
-
-    if (isNextBatch) {
-      archiveGrid.insertAdjacentHTML("beforeend", htmlCards);
-    } else {
-      archiveGrid.innerHTML = htmlCards;
-    }
-
-    // Toggle Load More button visibility based on fetched item count
-    if (loadMoreBtn) {
-      if (snapshot.docs.length < PAGE_SIZE) {
-        loadMoreBtn.style.display = "none";
-      } else {
-        loadMoreBtn.style.display = "inline-block";
-        loadMoreBtn.textContent = "Load More News ↓";
-        loadMoreBtn.disabled = false;
-      }
-    }
-
-  } catch (error) {
-    console.warn("Archive pagination fallback:", error);
-    if (loadMoreBtn) {
       loadMoreBtn.style.display = "none";
     }
-  } finally {
-    isLoading = false;
   }
 }
 
 /* =========================================
-   INITIALIZE & EVENT LISTENERS
+   APPLY FILTERS (CATEGORY & DISTRICT)
 ========================================= */
 
-document.addEventListener("DOMContentLoaded", () => {
-  loadArchiveNews(false);
+function applyFilters() {
+  const categorySelect = document.getElementById("archiveCategory");
+  const districtSelect = document.getElementById("archiveDistrict");
 
+  const selectedCategory = categorySelect ? categorySelect.value.toLowerCase() : "all";
+  const selectedDistrict = districtSelect ? districtSelect.value.toLowerCase() : "all";
+
+  filteredArticles = allNewsItems.filter(item => {
+    const catMatch = selectedCategory === "all" || String(item.category || "").toLowerCase().includes(selectedCategory);
+    const distMatch = selectedDistrict === "all" || String(item.district || "").toLowerCase().includes(selectedDistrict);
+    return catMatch && distMatch;
+  });
+
+  displayedCount = 0;
+  renderBatch();
+}
+
+/* =========================================
+   LOAD ARCHIVE NEWS DATA
+========================================= */
+
+async function fetchArchiveData() {
+  const archiveGrid = document.getElementById("archiveGrid");
+
+  try {
+    const newsQuery = query(collection(db, "automaticNews"), limit(100));
+    const snapshot = await getDocs(newsQuery);
+
+    if (snapshot.empty) {
+      if (archiveGrid) {
+        archiveGrid.innerHTML = `<p style="padding: 30px; text-align: center; color: #64748b; grid-column: 1/-1;">No archived articles found in database.</p>`;
+      }
+      return;
+    }
+
+    allNewsItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+    // In-memory sort by date descending
+    allNewsItems.sort((a, b) => parseArticleDate(b) - parseArticleDate(a));
+
+    applyFilters();
+
+  } catch (error) {
+    console.error("Error fetching archive data:", error);
+    if (archiveGrid) {
+      archiveGrid.innerHTML = `<p style="padding: 30px; text-align: center; color: #e63946; grid-column: 1/-1;">Failed to load archive articles. Please refresh the page.</p>`;
+    }
+  }
+}
+
+/* =========================================
+   INITIALIZATION
+========================================= */
+
+function initArchive() {
+  fetchArchiveData();
+
+  const categorySelect = document.getElementById("archiveCategory");
+  const districtSelect = document.getElementById("archiveDistrict");
   const loadMoreBtn = document.getElementById("loadMoreBtn");
+
+  if (categorySelect) categorySelect.addEventListener("change", applyFilters);
+  if (districtSelect) districtSelect.addEventListener("change", applyFilters);
+
   if (loadMoreBtn) {
     loadMoreBtn.addEventListener("click", () => {
-      loadArchiveNews(true);
+      renderBatch();
     });
   }
-});
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initArchive);
+} else {
+  initArchive();
+}
