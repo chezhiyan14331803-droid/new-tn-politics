@@ -12,6 +12,12 @@ import {
 import { db } from "./firebase-config.js";
 
 /* ================================
+   GLOBAL STATE FOR CATEGORY FILTERING
+================================ */
+let allNewsItems = [];
+let activeCategory = "ALL";
+
+/* ================================
    STRICT DATE PARSING FIX
 ================================ */
 
@@ -94,10 +100,86 @@ async function trackArticleClick(articleId) {
 window.trackArticleClick = trackArticleClick;
 
 /* ================================
+   CATEGORY FILTER SETUP & RENDER
+================================ */
+
+function renderNewsGrid() {
+  const previousNewsGrid = document.getElementById("previousNewsGrid");
+  if (!previousNewsGrid) return;
+
+  // Filter items (skip index 0 which is reserved for Today's Card)
+  let itemsToDisplay = allNewsItems.slice(1);
+
+  if (activeCategory !== "ALL") {
+    itemsToDisplay = itemsToDisplay.filter(news => {
+      const cat = String(news.category || "").toUpperCase();
+      return cat.includes(activeCategory);
+    });
+  }
+
+  if (itemsToDisplay.length === 0) {
+    previousNewsGrid.innerHTML = `<p style="padding: 20px; color: #64748b; grid-column: 1/-1;">No articles found for <strong>${activeCategory}</strong> category.</p>`;
+    return;
+  }
+
+  previousNewsGrid.innerHTML = itemsToDisplay
+    .map(news => {
+      const type = news.type || "automatic";
+      const readerLink = createReaderLink(news.id, type);
+      const districtTag = news.district ? ` • 📍 ${news.district}` : "";
+
+      return `
+        <article class="publication-item">
+          <div>
+            <p class="news-category">
+              ${getCategoryIcon(news.category)} ${categoryName(news.category)}${districtTag}
+            </p>
+            <strong>${news.title || "Latest News"}</strong>
+            <p>📅 ${formatDate(news)}</p>
+          </div>
+          <a class="read-button" href="${readerLink}" onclick="trackArticleClick('${news.id}')">
+            Read News
+          </a>
+        </article>
+      `;
+    })
+    .join("");
+}
+
+function setupCategoryFilters() {
+  const categoryGrid = document.querySelector(".category-grid");
+  if (!categoryGrid) return;
+
+  const buttons = categoryGrid.querySelectorAll("button");
+  buttons.forEach(button => {
+    button.addEventListener("click", () => {
+      const selectedCat = button.textContent.trim().toUpperCase();
+
+      buttons.forEach(btn => {
+        btn.style.background = "";
+        btn.style.color = "";
+      });
+
+      if (activeCategory === selectedCat) {
+        activeCategory = "ALL"; // Reset on second click
+      } else {
+        activeCategory = selectedCat;
+        button.style.background = "#e63946";
+        button.style.color = "#ffffff";
+      }
+
+      renderNewsGrid();
+    });
+  });
+}
+
+/* ================================
    RENDER HOMEPAGE
 ================================ */
 
 function displayNews(newsItems) {
+  allNewsItems = newsItems || [];
+
   const homeNewsTitle = document.getElementById("homeNewsTitle");
   const homeNewsDescription = document.getElementById("homeNewsDescription");
   const breakingNewsText = document.getElementById("breakingNewsText");
@@ -162,32 +244,8 @@ function displayNews(newsItems) {
     homeReadButton.onclick = () => trackArticleClick(latest.id);
   }
 
-  /* Grid Items */
-  const previousNews = newsItems.slice(1);
-  if (!previousNewsGrid) return;
-
-  previousNewsGrid.innerHTML = previousNews
-    .map(news => {
-      const type = news.type || "automatic";
-      const readerLink = createReaderLink(news.id, type);
-      const districtTag = news.district ? ` • 📍 ${news.district}` : "";
-
-      return `
-        <article class="publication-item">
-          <div>
-            <p class="news-category">
-              ${getCategoryIcon(news.category)} ${categoryName(news.category)}${districtTag}
-            </p>
-            <strong>${news.title || "Latest News"}</strong>
-            <p>📅 ${formatDate(news)}</p>
-          </div>
-          <a class="read-button" href="${readerLink}" onclick="trackArticleClick('${news.id}')">
-            Read News
-          </a>
-        </article>
-      `;
-    })
-    .join("");
+  /* Render Grid Items */
+  renderNewsGrid();
 }
 
 /* ================================
@@ -243,6 +301,7 @@ function loadHomeNews() {
     });
   }
 
+  setupCategoryFilters();
   loadTrendingNews();
 
   // QUERY FIRESTORE ORDERED BY SAVEDAT DESCENDING DIRECTLY
