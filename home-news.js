@@ -18,6 +18,32 @@ let allNewsItems = [];
 let activeCategory = "ALL";
 
 /* ================================
+   LOCAL PWA NOTIFICATION TRIGGER
+================================ */
+
+function triggerLocalNewsNotification(headlineTitle) {
+  if (!headlineTitle) return;
+
+  // Prevent duplicate alerts on every page reload/re-render
+  const lastNotified = localStorage.getItem("lastNotifiedHeadline");
+  if (lastNotified === headlineTitle) return;
+
+  if ("serviceWorker" in navigator && Notification.permission === "granted") {
+    navigator.serviceWorker.ready.then((registration) => {
+      registration.showNotification("⚡ Breaking News Update", {
+        body: headlineTitle,
+        icon: "/logo.png",
+        badge: "/logo.png",
+        vibrate: [200, 100, 200],
+        data: { url: "/index.html" },
+        tag: "breaking-news-notification" // Replaces existing alert to avoid tray clutter
+      });
+      localStorage.setItem("lastNotifiedHeadline", headlineTitle);
+    });
+  }
+}
+
+/* ================================
    STRICT DATE PARSING FIX
 ================================ */
 
@@ -203,6 +229,11 @@ function displayNews(newsItems) {
   const articleType = latest.type || "automatic";
   const latestReaderLink = createReaderLink(latest.id, articleType);
   const hasPdf = Boolean(latest.pdfUrl && articleType !== "automatic");
+
+  // Trigger system push notification if new headline is detected 🔔
+  if (latest.title) {
+    triggerLocalNewsNotification(latest.title);
+  }
 
   /* Handle PDF element visibility on Today's Card */
   if (todayPdfIcon) {

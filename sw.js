@@ -86,3 +86,54 @@ self.addEventListener("notificationclick", (event) => {
     })
   );
 });
+/* =========================================
+   PWA PUSH NOTIFICATION HANDLERS
+========================================= */
+
+// 1. Listen for background Push events (from FCM / server)
+self.addEventListener("push", (event) => {
+  let data = { title: "Daily News Update", body: "Check out the latest breaking headlines from Tamil Nadu!" };
+
+  if (event.data) {
+    try {
+      data = event.data.json();
+    } catch (e) {
+      data.body = event.data.text();
+    }
+  }
+
+  const options = {
+    body: data.body || "New breaking story published.",
+    icon: "/logo.png",
+    badge: "/logo.png",
+    vibrate: [100, 50, 100],
+    data: { url: data.url || "/index.html" },
+    actions: [
+      { action: "open", title: "📰 Read News" }
+    ]
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(data.title || "DAILY NEWS UPDATE", options)
+  );
+});
+
+// 2. Handle Notification Click
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+
+  const targetUrl = event.notification.data?.url || "/index.html";
+
+  event.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
+      for (let client of windowClients) {
+        if (client.url.includes(targetUrl) && "focus" in client) {
+          return client.focus();
+        }
+      }
+      if (clients.openWindow) {
+        return clients.openWindow(targetUrl);
+      }
+    })
+  );
+});

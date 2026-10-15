@@ -101,11 +101,10 @@ function updateSocialMetaTags(title, description, imageUrl, articleUrl) {
    BUTTON ACTIONS & EVENT LISTENERS
 ========================================= */
 
-// 1. Share Functionality
+// Share Functionality
 function setupSharing() {
   const articleUrl = window.location.href;
 
-  // Global Share Function (for inline onclick="shareNews()")
   window.shareNews = function () {
     if (navigator.share) {
       navigator.share({
@@ -120,7 +119,6 @@ function setupSharing() {
     }
   };
 
-  // WhatsApp Button
   if (whatsappShareBtn) {
     whatsappShareBtn.addEventListener("click", () => {
       const message = encodeURIComponent(`📰 *${currentArticleTitle}*\n\nRead more here: ${articleUrl}`);
@@ -128,7 +126,6 @@ function setupSharing() {
     });
   }
 
-  // Native Share Button
   if (nativeShareBtn) {
     nativeShareBtn.addEventListener("click", () => {
       window.shareNews();
@@ -136,47 +133,129 @@ function setupSharing() {
   }
 }
 
-// 2. Text-to-Speech (Audio)
-function setupAudioPlayer() {
-  if (!audioNewsBtn) return;
+/* =========================================
+   VOICE NEWS (TEXT-TO-SPEECH) CONTROLLER
+========================================= */
 
-  if (!("speechSynthesis" in window)) {
-    audioNewsBtn.style.display = "none";
+let synth = window.speechSynthesis;
+let utterance = null;
+let currentSpeed = 1.0;
+const speeds = [1.0, 1.25, 1.5, 0.8];
+let speedIndex = 0;
+
+function updateTTSUI(isPlayingState, statusMessage) {
+  const playBtn = document.getElementById("ttsPlayBtn");
+  const statusText = document.getElementById("ttsStatus");
+
+  if (playBtn) {
+    playBtn.textContent = isPlayingState ? "⏹️" : "▶️";
+  }
+
+  if (statusText) {
+    statusText.textContent = statusMessage;
+  }
+}
+
+function getBestVoice(langCode) {
+  if (!synth) return null;
+  const voices = synth.getVoices();
+  if (!voices || voices.length === 0) return null;
+
+  let matchedVoice = voices.find(v => v.lang === langCode || v.lang.replace('_', '-').startsWith(langCode.slice(0, 2)));
+  return matchedVoice || voices[0];
+}
+
+if (typeof speechSynthesis !== "undefined" && speechSynthesis.onvoiceschanged !== undefined) {
+  speechSynthesis.onvoiceschanged = () => {
+    if (synth) synth.getVoices();
+  };
+}
+
+function playSpeech() {
+  const title = currentArticleTitle || readerTitle?.innerText || "";
+  const body = currentArticleText || readerDescription?.innerText || "";
+  const fullText = `${title}. ${body}`.trim();
+
+  if (!fullText) {
+    updateTTSUI(false, "No article text available to read");
     return;
   }
 
-  audioNewsBtn.addEventListener("click", () => {
-    if (isSpeaking) {
-      window.speechSynthesis.cancel();
-      isSpeaking = false;
-      audioNewsBtn.innerHTML = "🔊 Listen to News";
+  // Always cancel any existing playback before starting new utterance
+  synth.cancel();
+
+  utterance = new SpeechSynthesisUtterance(fullText);
+
+  // Set speed directly on the new Utterance instance
+  utterance.rate = currentSpeed;
+
+  // Auto-detect language (Tamil vs English)
+  const containsTamil = /[\u0B80-\u0BFF]/.test(fullText);
+  const targetLang = containsTamil ? "ta-IN" : "en-IN";
+  utterance.lang = targetLang;
+
+  const voice = getBestVoice(targetLang);
+  if (voice) {
+    utterance.voice = voice;
+  }
+
+  utterance.onstart = () => {
+    updateTTSUI(true, `Reading news aloud (${currentSpeed}x)...`);
+  };
+
+  utterance.onend = () => {
+    updateTTSUI(false, "Finished listening");
+  };
+
+  utterance.onerror = (event) => {
+    if (event.error === "interrupted" || event.error === "canceled") {
       return;
     }
+    console.warn("Speech synthesis error:", event);
+    updateTTSUI(false, "Audio unavailable for this article");
+  };
 
-    const textToRead = `${currentArticleTitle}. ${currentArticleText}`;
-    if (!textToRead.trim()) return;
-
-    const utterance = new SpeechSynthesisUtterance(textToRead);
-    utterance.lang = "en-IN";
-    utterance.rate = 1.0;
-
-    utterance.onend = () => {
-      isSpeaking = false;
-      audioNewsBtn.innerHTML = "🔊 Listen to News";
-    };
-
-    utterance.onerror = () => {
-      isSpeaking = false;
-      audioNewsBtn.innerHTML = "🔊 Listen to News";
-    };
-
-    window.speechSynthesis.cancel(); // Stop any ongoing speech
-    window.speechSynthesis.speak(utterance);
-    isSpeaking = true;
-    audioNewsBtn.innerHTML = "⏹️ Stop Listening";
-  });
+  synth.speak(utterance);
 }
 
+function toggleVoiceNews() {
+  if (!("speechSynthesis" in window)) {
+    alert("Text-to-Speech is not supported in your browser.");
+    return;
+  }
+
+  if (synth.speaking || synth.pending) {
+    synth.cancel();
+    updateTTSUI(false, "Stopped. Tap play to listen");
+    return;
+  }
+
+  playSpeech();
+}
+window.toggleVoiceNews = toggleVoiceNews;
+
+function changeSpeed() {
+  speedIndex = (speedIndex + 1) % speeds.length;
+  currentSpeed = speeds[speedIndex];
+
+  const speedBtn = document.getElementById("ttsSpeedBtn");
+  if (speedBtn) {
+    speedBtn.textContent = `${currentSpeed}x`;
+  }
+
+  // If currently playing, restart playback immediately with the new speed
+  if (synth && (synth.speaking || synth.pending)) {
+    synth.cancel();
+    setTimeout(() => {
+      playSpeech();
+    }, 150);
+  }
+}
+window.changeSpeed = changeSpeed;
+
+window.addEventListener("beforeunload", () => {
+  if (synth) synth.cancel();
+});
 /* =========================================
    LOAD ARTICLE
 ========================================= */
@@ -265,9 +344,8 @@ async function loadArticle() {
       if (readerDownload) readerDownload.href = data.pdfUrl || "#";
     }
 
-    // Initialize button listeners after loading content
+    // Initialize sharing after loading content
     setupSharing();
-    setupAudioPlayer();
 
   } catch (error) {
     console.error("Error loading reader article:", error);

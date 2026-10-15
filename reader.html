@@ -121,6 +121,25 @@
             </iframe>
 
         </div>
+        <!-- Text-to-Speech Audio Player Bar -->
+<div class="tts-player" id="ttsPlayer" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px 18px; margin: 20px 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+    <div style="display: flex; align-items: center; gap: 10px;">
+        <button id="ttsPlayBtn" onclick="toggleVoiceNews()" style="background: #e63946; color: white; border: none; width: 42px; height: 42px; border-radius: 50%; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform 0.1s ease;">
+            ▶️
+        </button>
+        <div>
+            <strong style="display: block; font-size: 0.95rem; color: #1e293b;">Listen to Article</strong>
+            <span id="ttsStatus" style="font-size: 0.8rem; color: #64748b;">Tap play to listen</span>
+        </div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 8px;">
+        <!-- Voice Speed Toggle -->
+        <button onclick="changeSpeed()" id="ttsSpeedBtn" style="padding: 6px 10px; font-size: 0.8rem; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 6px; cursor: pointer; color: #334155; font-weight: bold;">
+            1.0x
+        </button>
+    </div>
+</div>
 
 
         <!-- ACTION BUTTONS -->
@@ -158,11 +177,6 @@
     <!-- General Native Web Share -->
     <button class="share-btn native-share" id="nativeShareBtn" type="button">
         ↗ Share Article
-    </button>
-
-    <!-- Text to Speech Audio Player -->
-    <button class="audio-btn" id="audioNewsBtn" type="button">
-        🔊 Listen to News
     </button>
 
 </div>
