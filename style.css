@@ -3922,3 +3922,15 @@ ins.adsbygoogle[data-anchor-status="displayed"] {
   top: auto !important;
   bottom: 0 !important;
 }
+/* Ensure mobile browser safe area below content */
+body {
+    padding-bottom: 80px !important;
+}
+
+/* Force Google AdSense mobile overlay layer above site elements */
+.google-auto-placed, 
+iframe[id^="aswift_"],
+ins.adsbygoogle-noablate {
+    z-index: 2147483647 !important; /* Maximum z-index */
+    pointer-events: auto !important;
+}
