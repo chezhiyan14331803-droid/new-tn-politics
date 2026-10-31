@@ -22,4 +22,5 @@ const db = getFirestore(app);
 
 await setPersistence(auth, browserLocalPersistence);
 
-export { auth, db };
+export { app,auth, db };
+export default app;
