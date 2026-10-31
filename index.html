@@ -301,87 +301,105 @@
 
     <!-- Fixed ES Module Script for Service Worker & Firebase Messaging -->
     <script type="module">
-        import { getMessaging, getToken } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging.js";
-        import  {app}  from "./firebase-config.js";
+    import { getMessaging, getToken } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging.js";
+    import { app } from "./firebase-config.js";
 
-        let deferredPrompt = null;
+    // 1. Attach deferredPrompt directly to window so it is globally available across page events
+    window.deferredPrompt = window.deferredPrompt || null;
 
-        if ("serviceWorker" in navigator) {
-            window.addEventListener("load", () => {
-                // Register the Service Worker script
-                navigator.serviceWorker.register("/firebase-messaging-sw.js")
-                    .then(reg => {
-                        console.log("Firebase Service Worker registered with scope:", reg.scope);
-                        
-                        // Request notification permission after 5 seconds
-                        if ("Notification" in window && Notification.permission === "default") {
-                            setTimeout(() => {
-                                Notification.requestPermission().then(async (permission) => {
-                                    if (permission === "granted") {
-                                        console.log("Notification permission granted!");
-                                        
-                                        try {
-                                            const messaging = getMessaging(app);
-                                            const currentToken = await getToken(messaging, {
-                                                serviceWorkerRegistration: reg,
-                                                vapidKey: "BOJrGx9TjYoeOxrY-D93F1ztVLgcQ1u507kgBI6YnvNR_EbcdbAVoIaYBB9wzUG58JnBk-5z2SvTrjjQDQS5RB4" // Replace with your VAPID key from Firebase Console
-                                            });
+    // Capture PWA Install Prompt immediately
+    window.addEventListener("beforeinstallprompt", (e) => {
+        e.preventDefault();
+        window.deferredPrompt = e;
+        console.log("PWA install prompt captured!");
+        
+        const installBtn = document.getElementById("pwaInstallBtn");
+        if (installBtn) {
+            installBtn.style.display = "inline-block";
+        }
+    });
 
-                                            if (currentToken) {
-                                                console.log("FCM Registration Token:", currentToken);
-                                            } else {
-                                                console.warn("No registration token available.");
-                                            }
-                                        } catch (err) {
-                                            console.error("Error retrieving FCM token: ", err);
+    if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+            // Register the Service Worker script
+            navigator.serviceWorker.register("/firebase-messaging-sw.js")
+                .then(reg => {
+                    console.log("Firebase Service Worker registered with scope:", reg.scope);
+                    
+                    // Request notification permission after 5 seconds
+                    if ("Notification" in window && Notification.permission === "default") {
+                        setTimeout(() => {
+                            Notification.requestPermission().then(async (permission) => {
+                                if (permission === "granted") {
+                                    console.log("Notification permission granted!");
+                                    
+                                    try {
+                                        const messaging = getMessaging(app);
+                                        const currentToken = await getToken(messaging, {
+                                            serviceWorkerRegistration: reg,
+                                            vapidKey: "BOJrGx9TjYoeOxrY-D93F1ztVLgcQ1u507kgBI6YnvNR_EbcdbAVoIaYBB9wzUG58JnBk-5z2SvTrjjQDQS5RB4"
+                                        });
+
+                                        if (currentToken) {
+                                            console.log("FCM Registration Token:", currentToken);
+                                        } else {
+                                            console.warn("No registration token available.");
                                         }
+                                    } catch (err) {
+                                        console.error("Error retrieving FCM token: ", err);
                                     }
-                                });
-                            }, 5000);
-                        }
-                    })
-                    .catch(err => console.warn("Service Worker registration failed:", err));
-            });
+                                }
+                            });
+                        }, 5000);
+                    }
+                })
+                .catch(err => console.warn("Service Worker registration failed:", err));
+        });
+    }
+
+    // Handler for installation click
+    async function installPWA() {
+        const installBtn = document.getElementById("pwaInstallBtn");
+
+        if (!window.deferredPrompt) {
+            alert("App installation is not available or already installed on this device.");
+            return;
         }
 
-        // Capture PWA Install Prompt
-        window.addEventListener("beforeinstallprompt", (e) => {
-            e.preventDefault();
-            deferredPrompt = e;
-            
-            const installBtn = document.getElementById("pwaInstallBtn");
-            if (installBtn) {
-                installBtn.style.display = "inline-block";
-            }
-        });
+        window.deferredPrompt.prompt();
 
-        // Handler for installation click
-        async function installPWA() {
-            const installBtn = document.getElementById("pwaInstallBtn");
+        const { outcome } = await window.deferredPrompt.userChoice;
+        console.log(`User choice result: ${outcome}`);
 
-            if (!deferredPrompt) {
-                alert("App installation is not available or already installed on this device.");
-                return;
-            }
+        window.deferredPrompt = null;
 
-            deferredPrompt.prompt();
-
-            const { outcome } = await deferredPrompt.userChoice;
-            console.log(`User choice result: ${outcome}`);
-
-            deferredPrompt = null;
-
-            if (installBtn) {
-                installBtn.style.display = "none";
-            }
+        if (installBtn) {
+            installBtn.style.display = "none";
         }
+    }
 
-        document.addEventListener("DOMContentLoaded", () => {
-            const installBtn = document.getElementById("pwaInstallBtn");
-            if (installBtn) {
-                installBtn.addEventListener("click", installPWA);
-            }
-        });
-    </script>
+    // Attach click listener directly when DOM is ready
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", attachInstallListener);
+    } else {
+        attachInstallListener();
+    }
+
+    function attachInstallListener() {
+        const installBtn = document.getElementById("pwaInstallBtn");
+        if (installBtn) {
+            installBtn.addEventListener("click", installPWA);
+        }
+    }
+
+    // Hide button automatically if app is successfully installed
+    window.addEventListener("appinstalled", () => {
+        window.deferredPrompt = null;
+        const installBtn = document.getElementById("pwaInstallBtn");
+        if (installBtn) {
+            installBtn.style.display = "none";
+        }
+    });
+</script>
 </body>
 </html>
