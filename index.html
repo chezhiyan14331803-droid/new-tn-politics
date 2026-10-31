@@ -19,13 +19,7 @@
 
     <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="style.css">
-    <nav class="navbar">
-    <a href="admin.html">Admin</a>
-    <a href="#">Home</a>
-    <a href="snippets.html" style="color: #e63946; font-weight: bold;">⚡ Reels</a>
-    <a href="#categories">Categories</a>
-    <a href="#previous">Previous News</a>
-</nav>
+
     <!-- Google AdSense Script with Bottom Anchor Lock -->
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8232375659484714"
             crossorigin="anonymous"
@@ -91,6 +85,7 @@
         <nav class="navbar">
             <a href="admin.html">Admin</a>
             <a href="#">Home</a>
+            <a href="snippets.html" style="color: #e63946; font-weight: bold;">⚡ Reels</a>
             <a href="#categories">Categories</a>
             <a href="#previous">Previous News</a>
         </nav>
@@ -301,51 +296,52 @@
     <!-- Scripts -->
     <script src="script.js"></script>
     <script type="module" src="home-news.js?v=2.4"></script>
-    <script>
+
+    <!-- Fixed ES Module Script for Service Worker & Firebase Messaging -->
+    <script type="module">
+        import { getMessaging, getToken } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging.js";
+        import { app } from "./firebase-config.js";
+
         let deferredPrompt = null;
 
-       import { getMessaging, getToken } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging.js";
-import { app } from "./firebase-config.js"; // Import your initialized firebase app
+        if ("serviceWorker" in navigator) {
+            window.addEventListener("load", () => {
+                // Register the Service Worker script
+                navigator.serviceWorker.register("/firebase-messaging-sw.js")
+                    .then(reg => {
+                        console.log("Firebase Service Worker registered with scope:", reg.scope);
+                        
+                        // Request notification permission after 5 seconds
+                        if ("Notification" in window && Notification.permission === "default") {
+                            setTimeout(() => {
+                                Notification.requestPermission().then(async (permission) => {
+                                    if (permission === "granted") {
+                                        console.log("Notification permission granted!");
+                                        
+                                        try {
+                                            const messaging = getMessaging(app);
+                                            const currentToken = await getToken(messaging, {
+                                                serviceWorkerRegistration: reg,
+                                                vapidKey: "YOUR_VAPID_KEY" // Replace with your VAPID key from Firebase Console
+                                            });
 
-if ("serviceWorker" in navigator) {
-    window.addEventListener("load", () => {
-        // 1. Register the exact file Firebase Messaging requires
-        navigator.serviceWorker.register("/firebase-messaging-sw.js")
-            .then(reg => {
-                console.log("Firebase Service Worker registered with scope:", reg.scope);
-                
-                // 2. Request notification permission
-                if ("Notification" in window && Notification.permission === "default") {
-                    setTimeout(() => {
-                        Notification.requestPermission().then(async (permission) => {
-                            if (permission === "granted") {
-                                console.log("Notification permission granted!");
-                                
-                                // 3. Get the FCM Token required to send background pushes
-                                try {
-                                    const messaging = getMessaging(app);
-                                    const currentToken = await getToken(messaging, {
-                                        serviceWorkerRegistration: reg,
-                                        vapidKey: "YOUR_VAPID_KEY" // Found in Firebase Console -> Project Settings -> Cloud Messaging -> Web Push certificates
-                                    });
-
-                                    if (currentToken) {
-                                        console.log("FCM Registration Token:", currentToken);
-                                        // Save this currentToken to your Firestore database so you can target this user later!
-                                    } else {
-                                        console.warn("No registration token available. Request permission to generate one.");
+                                            if (currentToken) {
+                                                console.log("FCM Registration Token:", currentToken);
+                                            } else {
+                                                console.warn("No registration token available.");
+                                            }
+                                        } catch (err) {
+                                            console.error("Error retrieving FCM token: ", err);
+                                        }
                                     }
-                                } catch (err) {
-                                    console.error("An error occurred while retrieving token: ", err);
-                                }
-                            }
-                        });
-                    }, 5000);
-                }
-            })
-            .catch(err => console.warn("Service Worker registration failed:", err));
-    });
-}
+                                });
+                            }, 5000);
+                        }
+                    })
+                    .catch(err => console.warn("Service Worker registration failed:", err));
+            });
+        }
+
         // Capture PWA Install Prompt
         window.addEventListener("beforeinstallprompt", (e) => {
             e.preventDefault();
@@ -357,7 +353,7 @@ if ("serviceWorker" in navigator) {
             }
         });
 
-        // Async handler for installation click
+        // Handler for installation click
         async function installPWA() {
             const installBtn = document.getElementById("pwaInstallBtn");
 
@@ -366,7 +362,6 @@ if ("serviceWorker" in navigator) {
                 return;
             }
 
-            // Show native install dialog
             deferredPrompt.prompt();
 
             const { outcome } = await deferredPrompt.userChoice;
