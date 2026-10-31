@@ -304,27 +304,48 @@
     <script>
         let deferredPrompt = null;
 
-        if ("serviceWorker" in navigator) {
-            window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js")
-                    .then(reg => {
-                        console.log("PWA Service Worker registered!", reg.scope);
-                        
-                        // Request notification permission after 5 seconds of browsing
-                        if ("Notification" in window && Notification.permission === "default") {
-                            setTimeout(() => {
-                                Notification.requestPermission().then(permission => {
-                                    if (permission === "granted") {
-                                        console.log("Notification permission granted!");
-                                    }
-                                });
-                            }, 5000);
-                        }
-                    })
-                    .catch(err => console.warn("Service Worker registration failed:", err));
-            });
-        }
+       import { getMessaging, getToken } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging.js";
+import { app } from "./firebase-config.js"; // Import your initialized firebase app
 
+if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+        // 1. Register the exact file Firebase Messaging requires
+        navigator.serviceWorker.register("/firebase-messaging-sw.js")
+            .then(reg => {
+                console.log("Firebase Service Worker registered with scope:", reg.scope);
+                
+                // 2. Request notification permission
+                if ("Notification" in window && Notification.permission === "default") {
+                    setTimeout(() => {
+                        Notification.requestPermission().then(async (permission) => {
+                            if (permission === "granted") {
+                                console.log("Notification permission granted!");
+                                
+                                // 3. Get the FCM Token required to send background pushes
+                                try {
+                                    const messaging = getMessaging(app);
+                                    const currentToken = await getToken(messaging, {
+                                        serviceWorkerRegistration: reg,
+                                        vapidKey: "YOUR_VAPID_KEY" // Found in Firebase Console -> Project Settings -> Cloud Messaging -> Web Push certificates
+                                    });
+
+                                    if (currentToken) {
+                                        console.log("FCM Registration Token:", currentToken);
+                                        // Save this currentToken to your Firestore database so you can target this user later!
+                                    } else {
+                                        console.warn("No registration token available. Request permission to generate one.");
+                                    }
+                                } catch (err) {
+                                    console.error("An error occurred while retrieving token: ", err);
+                                }
+                            }
+                        });
+                    }, 5000);
+                }
+            })
+            .catch(err => console.warn("Service Worker registration failed:", err));
+    });
+}
         // Capture PWA Install Prompt
         window.addEventListener("beforeinstallprompt", (e) => {
             e.preventDefault();
