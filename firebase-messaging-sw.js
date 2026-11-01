@@ -4,12 +4,12 @@ importScripts('https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-comp
 
 // Initialize Firebase in the service worker
 firebase.initializeApp({
-  apiKey: "YOUR_API_KEY",
+  apiKey: "AIzaSyAAkydhw6zWTzXAmF8BNjiAz1TdkJIe1Yg",
   authDomain: "new-tn-politics.firebaseapp.com",
   projectId: "new-tn-politics",
-  storageBucket: "new-tn-politics.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  storageBucket: "new-tn-politics.firebasestorage.app",
+  messagingSenderId: "660588395392",
+  appId: "1:660588395392:web:e361f8ad0ca23210645f65"
 });
 
 const messaging = firebase.messaging();
