@@ -68,3 +68,4 @@ node_modules/
 # dataconnect generated files
 .dataconnect
 news-api.js
+serviceAccountKey.json

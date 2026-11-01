@@ -6,7 +6,7 @@
     <meta name="google-site-verification" content="XEYXSi7hj_nw8-i8DrZ8j2Yo1aw1Hcfd0d1vPwqFt3U" />
     <meta name="theme-color" content="#151515">
     <meta name="description" content="Daily News Updates — Get the latest Tamil Nadu, India, World, Politics, Sports, Technology, Education and Business news.">
-
+    <meta name="robots" content="max-image-preview:large">
     <!-- Open Graph / Social Sharing Meta Tags -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Daily News Updates" />
@@ -339,21 +339,7 @@
                                             serviceWorkerRegistration: reg,
                                             vapidKey: "BOJrGx9TjYoeOxrY-D93F1ztVLgcQ1u507kgBI6YnvNR_EbcdbAVoIaYBB9wzUG58JnBk-5z2SvTrjjQDQS5RB4"
                                         });
-                                        if (currentToken) {
-  console.log("FCM Registration Token:", currentToken);
-
-  // Send token to your Cloud Function to subscribe to news_updates
-  try {
-    await fetch("https://us-central1-new-tn-politics.cloudfunctions.net/subscribeToTopic", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token: currentToken })
-    });
-    console.log("Subscribed to news_updates topic successfully!");
-  } catch (err) {
-    console.error("Topic subscription failed:", err);
-  }
-}
+                                        
 
                                         if (currentToken) {
                                             console.log("FCM Registration Token:", currentToken);
