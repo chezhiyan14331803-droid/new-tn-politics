@@ -240,19 +240,19 @@
     </main>
 
     <!-- Bottom AdSense Banner -->
-<div style="text-align: center; margin: 30px auto; width: 100%; max-width: 100%; overflow: hidden;">
-    <ins class="adsbygoogle"
-         style="display:block; min-width: 250px; min-height: 90px;"
-         data-ad-client="ca-pub-8232375659484714"
-         data-ad-slot="2460021613"
-         data-ad-format="auto"
-         data-full-width-responsive="true"></ins>
-    <script>
-         window.addEventListener('load', function() {
-             (adsbygoogle = window.adsbygoogle || []).push({});
-         });
-    </script>
-</div>
+    <div style="text-align: center; margin: 30px auto; width: 100%; max-width: 100%; overflow: hidden;">
+        <ins class="adsbygoogle"
+             style="display:block; min-width: 250px; min-height: 90px;"
+             data-ad-client="ca-pub-8232375659484714"
+             data-ad-slot="2460021613"
+             data-ad-format="auto"
+             data-full-width-responsive="true"></ins>
+        <script>
+             window.addEventListener('load', function() {
+                 (adsbygoogle = window.adsbygoogle || []).push({});
+             });
+        </script>
+    </div>
 
     <!-- Footer -->
     <footer class="footer">
@@ -299,108 +299,127 @@
     <script src="script.js"></script>
     <script type="module" src="home-news.js?v=2.4"></script>
 
-    <!-- Fixed ES Module Script for Service Worker & Firebase Messaging -->
+    <!-- ES Module Script for PWA & Firebase FCM -->
     <script type="module">
-    import { getMessaging, getToken } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging.js";
-    import { app } from "./firebase-config.js";
+        import { getMessaging, getToken, onMessage, isSupported } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging.js";
+        import { app } from "./firebase-config.js";
 
-    // 1. Attach deferredPrompt directly to window so it is globally available across page events
-    window.deferredPrompt = window.deferredPrompt || null;
+        // Global prompt capture for PWA
+        window.deferredPrompt = window.deferredPrompt || null;
 
-    // Capture PWA Install Prompt immediately
-    window.addEventListener("beforeinstallprompt", (e) => {
-        e.preventDefault();
-        window.deferredPrompt = e;
-        console.log("PWA install prompt captured!");
-        
-        const installBtn = document.getElementById("pwaInstallBtn");
-        if (installBtn) {
-            installBtn.style.display = "inline-block";
-        }
-    });
+        window.addEventListener("beforeinstallprompt", (e) => {
+            e.preventDefault();
+            window.deferredPrompt = e;
+            console.log("PWA install prompt captured!");
+            
+            const installBtn = document.getElementById("pwaInstallBtn");
+            if (installBtn) {
+                installBtn.style.display = "inline-block";
+            }
+        });
 
-    if ("serviceWorker" in navigator) {
-        window.addEventListener("load", () => {
-            // Register the Service Worker script
-            navigator.serviceWorker.register("/firebase-messaging-sw.js")
-                .then(reg => {
+        // Initialize Service Worker and FCM token retrieval cleanly
+        if ("serviceWorker" in navigator) {
+            window.addEventListener("load", async () => {
+                try {
+                    const hasMessagingSupport = await isSupported();
+                    if (!hasMessagingSupport) {
+                        console.warn("FCM Messaging is not supported in this browser.");
+                        return;
+                    }
+
+                    const reg = await navigator.serviceWorker.register("/firebase-messaging-sw.js");
                     console.log("Firebase Service Worker registered with scope:", reg.scope);
-                    
-                    // Request notification permission after 5 seconds
+
                     if ("Notification" in window && Notification.permission === "default") {
                         setTimeout(() => {
-                            Notification.requestPermission().then(async (permission) => {
+                            Notification.requestPermission().then((permission) => {
                                 if (permission === "granted") {
                                     console.log("Notification permission granted!");
-                                    
-                                    try {
-                                        const messaging = getMessaging(app);
-                                        const currentToken = await getToken(messaging, {
-                                            serviceWorkerRegistration: reg,
-                                            vapidKey: "BOJrGx9TjYoeOxrY-D93F1ztVLgcQ1u507kgBI6YnvNR_EbcdbAVoIaYBB9wzUG58JnBk-5z2SvTrjjQDQS5RB4"
-                                        });
-                                        
-
-                                        if (currentToken) {
-                                            console.log("FCM Registration Token:", currentToken);
-                                        } else {
-                                            console.warn("No registration token available.");
-                                        }
-                                    } catch (err) {
-                                        console.error("Error retrieving FCM token: ", err);
-                                    }
+                                    fetchFCMToken(app, reg);
                                 }
                             });
                         }, 5000);
+                    } else if (Notification.permission === "granted") {
+                        fetchFCMToken(app, reg);
                     }
-                })
-                .catch(err => console.warn("Service Worker registration failed:", err));
+                } catch (err) {
+                    console.warn("Service Worker registration failed:", err);
+                }
+            });
+        }
+
+        async function fetchFCMToken(firebaseApp, swRegistration) {
+            try {
+                const messaging = getMessaging(firebaseApp);
+                const currentToken = await getToken(messaging, {
+                    serviceWorkerRegistration: swRegistration,
+                    vapidKey: "BOJrGx9TjYoeOxrY-D93F1ztVLgcQ1u507kgBI6YnvNR_EbcdbAVoIaYBB9wzUG58JnBk-5z2SvTrjjQDQS5RB4"
+                });
+
+                if (currentToken) {
+                    console.log("🔑 FCM Registration Token:", currentToken);
+                } else {
+                    console.warn("No registration token available.");
+                }
+
+                // Foreground message handler
+                onMessage(messaging, (payload) => {
+                    console.log("Foreground payload received:", payload);
+                    new Notification(payload.notification.title, {
+                        body: payload.notification.body,
+                        icon: "/logo.png",
+                        image: payload.notification.image
+                    });
+                });
+            } catch (err) {
+                console.error("Error retrieving FCM token:", err);
+            }
+        }
+
+        // Handler for PWA installation click
+        async function installPWA() {
+            const installBtn = document.getElementById("pwaInstallBtn");
+
+            if (!window.deferredPrompt) {
+                alert("App installation is not available or already installed on this device.");
+                return;
+            }
+
+            window.deferredPrompt.prompt();
+
+            const { outcome } = await window.deferredPrompt.userChoice;
+            console.log(`User choice result: ${outcome}`);
+
+            window.deferredPrompt = null;
+
+            if (installBtn) {
+                installBtn.style.display = "none";
+            }
+        }
+
+        // Attach click listener directly when DOM is ready
+        if (document.readyState === "loading") {
+            document.addEventListener("DOMContentLoaded", attachInstallListener);
+        } else {
+            attachInstallListener();
+        }
+
+        function attachInstallListener() {
+            const installBtn = document.getElementById("pwaInstallBtn");
+            if (installBtn) {
+                installBtn.addEventListener("click", installPWA);
+            }
+        }
+
+        // Hide button automatically if app is successfully installed
+        window.addEventListener("appinstalled", () => {
+            window.deferredPrompt = null;
+            const installBtn = document.getElementById("pwaInstallBtn");
+            if (installBtn) {
+                installBtn.style.display = "none";
+            }
         });
-    }
-
-    // Handler for installation click
-    async function installPWA() {
-        const installBtn = document.getElementById("pwaInstallBtn");
-
-        if (!window.deferredPrompt) {
-            alert("App installation is not available or already installed on this device.");
-            return;
-        }
-
-        window.deferredPrompt.prompt();
-
-        const { outcome } = await window.deferredPrompt.userChoice;
-        console.log(`User choice result: ${outcome}`);
-
-        window.deferredPrompt = null;
-
-        if (installBtn) {
-            installBtn.style.display = "none";
-        }
-    }
-
-    // Attach click listener directly when DOM is ready
-    if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", attachInstallListener);
-    } else {
-        attachInstallListener();
-    }
-
-    function attachInstallListener() {
-        const installBtn = document.getElementById("pwaInstallBtn");
-        if (installBtn) {
-            installBtn.addEventListener("click", installPWA);
-        }
-    }
-
-    // Hide button automatically if app is successfully installed
-    window.addEventListener("appinstalled", () => {
-        window.deferredPrompt = null;
-        const installBtn = document.getElementById("pwaInstallBtn");
-        if (installBtn) {
-            installBtn.style.display = "none";
-        }
-    });
-</script>
+    </script>
 </body>
 </html>
