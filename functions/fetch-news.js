@@ -3,16 +3,14 @@ const cheerio = require("cheerio");
 console.log("🔥 CURRENTS API VERSION 2 IS RUNNING 🔥");
 
 // =====================================================
-// FIREBASE INITIALIZATION
+// FIREBASE & FCM INITIALIZATION
 // =====================================================
 
 if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
   throw new Error("FIREBASE_SERVICE_ACCOUNT secret is missing.");
 }
 
-const serviceAccount = JSON.parse(
-  process.env.FIREBASE_SERVICE_ACCOUNT
-);
+const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
 
 if (!admin.apps.length) {
   admin.initializeApp({
@@ -21,6 +19,28 @@ if (!admin.apps.length) {
 }
 
 const db = admin.firestore();
+
+// Helper function to send push notifications
+async function sendNewsNotification(title, summary, imageUrl) {
+  const message = {
+    notification: {
+      title: title || "TN Politics - Breaking News",
+      body: summary || "Tap to read today's latest political updates.",
+    },
+    topic: "news_updates"
+  };
+
+  if (imageUrl) {
+    message.notification.image = imageUrl;
+  }
+
+  try {
+    const response = await admin.messaging().send(message);
+    console.log("Automated push notification sent successfully:", response);
+  } catch (error) {
+    console.error("Error sending push notification:", error);
+  }
+}
 
 // =====================================================
 // DISTRICT DETECTION HELPERS
@@ -62,9 +82,7 @@ const indiaTime = new Intl.DateTimeFormat("en-IN", {
 }).formatToParts(now);
 
 function getIndiaPart(name) {
-  return indiaTime.find(
-    part => part.type === name
-  )?.value;
+  return indiaTime.find(part => part.type === name)?.value;
 }
 
 const currentYear = Number(getIndiaPart("year"));
@@ -86,17 +104,8 @@ function makeDateString(year, month, day) {
 }
 
 function getPreviousDate(year, month, day) {
-  const date = new Date(
-    Date.UTC(
-      year,
-      month - 1,
-      day
-    )
-  );
-
-  date.setUTCDate(
-    date.getUTCDate() - 1
-  );
+  const date = new Date(Date.UTC(year, month - 1, day));
+  date.setUTCDate(date.getUTCDate() - 1);
 
   return {
     year: date.getUTCFullYear(),
@@ -110,49 +119,18 @@ function getPreviousDate(year, month, day) {
 // =====================================================
 
 const BATCHES = {
-  F1: {
-    startHour: 6,
-    startMinute: 0,
-    endHour: 10,
-    endMinute: 0
-  },
-
-  F2: {
-    startHour: 11,
-    startMinute: 0,
-    endHour: 17,
-    endMinute: 30
-  },
-
-  F3: {
-    startHour: 18,
-    startMinute: 0,
-    endHour: 22,
-    endMinute: 0
-  }
+  F1: { startHour: 6, startMinute: 0, endHour: 10, endMinute: 0 },
+  F2: { startHour: 11, startMinute: 0, endHour: 17, endMinute: 30 },
+  F3: { startHour: 18, startMinute: 0, endHour: 22, endMinute: 0 }
 };
 
 // =====================================================
 // IST → UTC
 // =====================================================
 
-function makeUTCDate(
-  year,
-  month,
-  day,
-  hour,
-  minute,
-  second = 0
-) {
+function makeUTCDate(year, month, day, hour, minute, second = 0) {
   return new Date(
-    Date.UTC(
-      year,
-      month - 1,
-      day,
-      hour - 5,
-      minute - 30,
-      second
-    )
+    Date.UTC(year, month - 1, day, hour - 5, minute - 30, second)
   ).toISOString();
 }
 
@@ -161,15 +139,10 @@ function makeUTCDate(
 // =====================================================
 
 function getArticleDate(article) {
-  if (!article || !article.published) {
-    return null;
-  }
+  if (!article || !article.published) return null;
 
   const date = new Date(article.published);
-
-  if (isNaN(date.getTime())) {
-    return null;
-  }
+  if (isNaN(date.getTime())) return null;
 
   const parts = new Intl.DateTimeFormat("en-IN", {
     timeZone: "Asia/Kolkata",
@@ -183,7 +156,6 @@ function getArticleDate(article) {
   }).formatToParts(date);
 
   const result = {};
-
   for (const part of parts) {
     if (part.type !== "literal") {
       result[part.type] = Number(part.value);
@@ -208,145 +180,77 @@ function getCategory(article) {
   const text = `
     ${article.title || ""}
     ${article.description || ""}
-    ${
-      Array.isArray(article.category)
-        ? article.category.join(" ")
-        : article.category || ""
-    }
+    ${Array.isArray(article.category) ? article.category.join(" ") : article.category || ""}
   `.toLowerCase();
 
   if (
-    text.includes("politic") ||
-    text.includes("election") ||
-    text.includes("minister") ||
-    text.includes("chief minister") ||
-    text.includes("mla") ||
-    text.includes(" mp ") ||
-    text.includes("government") ||
-    text.includes("assembly") ||
-    text.includes("party") ||
-    text.includes("bjp") ||
-    text.includes("congress") ||
-    text.includes("dmk") ||
-    text.includes("aiadmk") ||
-    text.includes("tvk")
+    text.includes("politic") || text.includes("election") || text.includes("minister") ||
+    text.includes("chief minister") || text.includes("mla") || text.includes(" mp ") ||
+    text.includes("government") || text.includes("assembly") || text.includes("party") ||
+    text.includes("bjp") || text.includes("congress") || text.includes("dmk") ||
+    text.includes("aiadmk") || text.includes("tvk")
   ) {
     return "Politics";
   }
 
   if (
-    text.includes("cricket") ||
-    text.includes("football") ||
-    text.includes("tennis") ||
-    text.includes("sport") ||
-    text.includes("match") ||
-    text.includes("player") ||
-    text.includes("tournament") ||
-    text.includes("ipl") ||
-    text.includes("world cup")
+    text.includes("cricket") || text.includes("football") || text.includes("tennis") ||
+    text.includes("sport") || text.includes("match") || text.includes("player") ||
+    text.includes("tournament") || text.includes("ipl") || text.includes("world cup")
   ) {
     return "Sports";
   }
 
   if (
-    text.includes("technology") ||
-    text.includes("tech") ||
-    text.includes("artificial intelligence") ||
-    text.includes("ai ") ||
-    text.includes("software") ||
-    text.includes("smartphone") ||
-    text.includes("computer") ||
-    text.includes("internet") ||
-    text.includes("cyber") ||
-    text.includes("startup")
+    text.includes("technology") || text.includes("tech") || text.includes("artificial intelligence") ||
+    text.includes("ai ") || text.includes("software") || text.includes("smartphone") ||
+    text.includes("computer") || text.includes("internet") || text.includes("cyber") || text.includes("startup")
   ) {
     return "Technology";
   }
 
   if (
-    text.includes("business") ||
-    text.includes("economy") ||
-    text.includes("market") ||
-    text.includes("stock") ||
-    text.includes("bank") ||
-    text.includes("company") ||
-    text.includes("investment") ||
-    text.includes("finance") ||
-    text.includes("rupee") ||
-    text.includes("trade")
+    text.includes("business") || text.includes("economy") || text.includes("market") ||
+    text.includes("stock") || text.includes("bank") || text.includes("company") ||
+    text.includes("investment") || text.includes("finance") || text.includes("rupee") || text.includes("trade")
   ) {
     return "Business";
   }
 
   if (
-    text.includes("education") ||
-    text.includes("school") ||
-    text.includes("college") ||
-    text.includes("university") ||
-    text.includes("student") ||
-    text.includes("exam") ||
-    text.includes("neet") ||
-    text.includes("academic") ||
-    text.includes("teacher")
+    text.includes("education") || text.includes("school") || text.includes("college") ||
+    text.includes("university") || text.includes("student") || text.includes("exam") ||
+    text.includes("neet") || text.includes("academic") || text.includes("teacher")
   ) {
     return "Education";
   }
 
   if (
-    text.includes("tamil nadu") ||
-    text.includes("tamilnadu") ||
-    text.includes("chennai") ||
-    text.includes("madurai") ||
-    text.includes("coimbatore") ||
-    text.includes("salem") ||
-    text.includes("trichy") ||
-    text.includes("tiruchirappalli") ||
-    text.includes("tiruppur") ||
-    text.includes("erode") ||
-    text.includes("vellore") ||
-    text.includes("thoothukudi") ||
-    text.includes("tirunelveli") ||
-    text.includes("dindigul") ||
-    text.includes("thanjavur") ||
-    text.includes("kanchipuram") ||
-    text.includes("cuddalore") ||
-    text.includes("namakkal") ||
-    text.includes("karur") ||
-    text.includes("sivaganga") ||
-    text.includes("virudhunagar") ||
+    text.includes("tamil nadu") || text.includes("tamilnadu") || text.includes("chennai") ||
+    text.includes("madurai") || text.includes("coimbatore") || text.includes("salem") ||
+    text.includes("trichy") || text.includes("tiruchirappalli") || text.includes("tiruppur") ||
+    text.includes("erode") || text.includes("vellore") || text.includes("thoothukudi") ||
+    text.includes("tirunelveli") || text.includes("dindigul") || text.includes("thanjavur") ||
+    text.includes("kanchipuram") || text.includes("cuddalore") || text.includes("namakkal") ||
+    text.includes("karur") || text.includes("sivaganga") || text.includes("virudhunagar") ||
     text.includes("ramanathapuram")
   ) {
     return "Tamil Nadu";
   }
 
   if (
-    text.includes("india") ||
-    text.includes("delhi") ||
-    text.includes("mumbai") ||
-    text.includes("kerala") ||
-    text.includes("karnataka") ||
-    text.includes("andhra pradesh") ||
-    text.includes("telangana") ||
-    text.includes("uttar pradesh") ||
-    text.includes("maharashtra")
+    text.includes("india") || text.includes("delhi") || text.includes("mumbai") ||
+    text.includes("kerala") || text.includes("karnataka") || text.includes("andhra pradesh") ||
+    text.includes("telangana") || text.includes("uttar pradesh") || text.includes("maharashtra")
   ) {
     return "India";
   }
 
   if (
-    text.includes("usa") ||
-    text.includes("united states") ||
-    text.includes("america") ||
-    text.includes("uk") ||
-    text.includes("united kingdom") ||
-    text.includes("china") ||
-    text.includes("russia") ||
-    text.includes("pakistan") ||
-    text.includes("israel") ||
-    text.includes("iran") ||
-    text.includes("europe") ||
-    text.includes("world") ||
-    text.includes("international")
+    text.includes("usa") || text.includes("united states") || text.includes("america") ||
+    text.includes("uk") || text.includes("united kingdom") || text.includes("china") ||
+    text.includes("russia") || text.includes("pakistan") || text.includes("israel") ||
+    text.includes("iran") || text.includes("europe") || text.includes("world") || text.includes("international")
   ) {
     return "World";
   }
@@ -359,21 +263,12 @@ function getCategory(article) {
 // =====================================================
 
 function getSourceName(article) {
-  if (
-    article.source &&
-    typeof article.source === "string"
-  ) {
+  if (article.source && typeof article.source === "string") {
     return article.source;
   }
-
-  if (!article.url) {
-    return "Unknown source";
-  }
-
+  if (!article.url) return "Unknown source";
   try {
-    return new URL(article.url)
-      .hostname
-      .replace(/^www\./, "");
+    return new URL(article.url).hostname.replace(/^www\./, "");
   } catch {
     return "Unknown source";
   }
@@ -384,22 +279,18 @@ function getSourceName(article) {
 // =====================================================
 
 async function deleteOldNews() {
-  console.log(
-    "🧹 Checking automaticNews for articles older than 20 days..."
-  );
+  console.log("🧹 Checking automaticNews for articles older than 20 days...");
 
   const cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() - 20);
 
   const snapshot = await db.collection("automaticNews").get();
-
   if (snapshot.empty) {
     console.log("✅ No automatic news found.");
     return;
   }
 
   const docsToDelete = [];
-
   for (const doc of snapshot.docs) {
     const data = doc.data();
     let savedDate = null;
@@ -432,17 +323,11 @@ async function deleteOldNews() {
   for (let i = 0; i < docsToDelete.length; i += 500) {
     const batch = db.batch();
     const chunk = docsToDelete.slice(i, i + 500);
-
-    chunk.forEach(doc => {
-      batch.delete(doc.ref);
-    });
-
+    chunk.forEach(doc => batch.delete(doc.ref));
     await batch.commit();
   }
 
-  console.log(
-    `🗑️ Deleted ${docsToDelete.length} automatic news article(s) older than 20 days.`
-  );
+  console.log(`🗑️ Deleted ${docsToDelete.length} automatic news article(s) older than 20 days.`);
 }
 
 // =====================================================
@@ -462,25 +347,15 @@ async function fetchCurrents(apiKey, startDate, endDate) {
   });
 
   const url = `https://api.currentsapi.services/v1/search?${params.toString()}`;
-
-  const response = await fetch(url, {
-    headers: {
-      Accept: "application/json"
-    }
-  });
+  const response = await fetch(url, { headers: { Accept: "application/json" } });
 
   if (!response.ok) {
-    throw new Error(
-      `Currents API request failed: ${response.status} ${response.statusText}`
-    );
+    throw new Error(`Currents API request failed: ${response.status} ${response.statusText}`);
   }
 
   const data = await response.json();
-
   if (data.status === "error") {
-    throw new Error(
-      data.message || data.msg || "Currents API returned an error."
-    );
+    throw new Error(data.message || data.msg || "Currents API returned an error.");
   }
 
   return Array.isArray(data.news) ? data.news : [];
@@ -513,26 +388,17 @@ async function fetchFullArticleDescription(url) {
     $("script, style, noscript, iframe, nav, header, footer, aside, form").remove();
 
     let paragraphs = [];
-
     const selectors = [
-      "article p",
-      "[itemprop='articleBody'] p",
-      ".article-body p",
-      ".article-content p",
-      ".story-body p",
-      ".story-content p",
-      ".post-content p",
-      ".entry-content p",
-      "main p"
+      "article p", "[itemprop='articleBody'] p", ".article-body p",
+      ".article-content p", ".story-body p", ".story-content p",
+      ".post-content p", ".entry-content p", "main p"
     ];
 
     for (const selector of selectors) {
       const found = [];
       $(selector).each((index, element) => {
         const text = $(element).text().replace(/\s+/g, " ").trim();
-        if (text.length >= 40) {
-          found.push(text);
-        }
+        if (text.length >= 40) found.push(text);
       });
 
       if (found.length >= 2) {
@@ -544,9 +410,7 @@ async function fetchFullArticleDescription(url) {
     if (paragraphs.length === 0) {
       $("p").each((index, element) => {
         const text = $(element).text().replace(/\s+/g, " ").trim();
-        if (text.length >= 40) {
-          paragraphs.push(text);
-        }
+        if (text.length >= 40) paragraphs.push(text);
       });
     }
 
@@ -568,20 +432,10 @@ async function fetchFullArticleDescription(url) {
 
 async function getArticlesForWindow(apiKey, dateInfo, batchName) {
   const batch = BATCHES[batchName];
+  if (!batch) throw new Error(`Unknown batch: ${batchName}`);
 
-  if (!batch) {
-    throw new Error(`Unknown batch: ${batchName}`);
-  }
-
-  const startDate = makeUTCDate(
-    dateInfo.year, dateInfo.month, dateInfo.day,
-    batch.startHour, batch.startMinute, 0
-  );
-
-  const endDate = makeUTCDate(
-    dateInfo.year, dateInfo.month, dateInfo.day,
-    batch.endHour, batch.endMinute + 1, 0
-  );
+  const startDate = makeUTCDate(dateInfo.year, dateInfo.month, dateInfo.day, batch.startHour, batch.startMinute, 0);
+  const endDate = makeUTCDate(dateInfo.year, dateInfo.month, dateInfo.day, batch.endHour, batch.endMinute + 1, 0);
 
   console.log(`🔎 Searching Currents for ${batchName}`);
   console.log(`   IST window: ${makeDateString(dateInfo.year, dateInfo.month, dateInfo.day)} ${String(batch.startHour).padStart(2, "0")}:${String(batch.startMinute).padStart(2, "0")} → ${String(batch.endHour).padStart(2, "0")}:${String(batch.endMinute).padStart(2, "0")}`);
@@ -620,7 +474,7 @@ function articleMatches(article, targetDate, batchName) {
 async function saveArticles(articles, batchName) {
   if (articles.length === 0) {
     console.log(`ℹ️ No ${batchName} articles to save.`);
-    return 0;
+    return [];
   }
 
   const uniqueArticles = [];
@@ -638,7 +492,7 @@ async function saveArticles(articles, batchName) {
 
   console.log(`💾 Processing ${uniqueArticles.length} ${batchName} article(s)...`);
 
-  if (uniqueArticles.length === 0) return 0;
+  if (uniqueArticles.length === 0) return [];
 
   const batch = db.batch();
   let saveCount = 0;
@@ -698,7 +552,7 @@ async function saveArticles(articles, batchName) {
 
   await batch.commit();
   console.log(`✅ ${saveCount} ${batchName} article(s) saved to automaticNews.`);
-  return saveCount;
+  return uniqueArticles;
 }
 
 // =====================================================
@@ -711,7 +565,7 @@ async function processBatch(apiKey, dateInfo, batchName) {
   const matches = articles.filter(article => articleMatches(article, targetDate, batchName));
 
   console.log(`📊 ${batchName} exact matches: ${matches.length}`);
-  return saveArticles(matches, batchName);
+  return await saveArticles(matches, batchName);
 }
 
 async function processAuto(apiKey) {
@@ -720,20 +574,25 @@ async function processAuto(apiKey) {
 
   console.log("🤖 AUTO MODE: checking today's F1, F2 and F3 windows...");
 
-  await processBatch(apiKey, today, "F1");
-  await processBatch(apiKey, today, "F2");
-  await processBatch(apiKey, today, "F3");
+  const f1 = await processBatch(apiKey, today, "F1");
+  const f2 = await processBatch(apiKey, today, "F2");
+  const f3 = await processBatch(apiKey, today, "F3");
+
+  let allArticles = [...(f1 || []), ...(f2 || []), ...(f3 || [])];
 
   if (currentHour < 6) {
     console.log("🌙 Before 6 AM IST: checking previous day's F3...");
-    await processBatch(apiKey, previous, "F3");
+    const f3Prev = await processBatch(apiKey, previous, "F3");
+    allArticles = [...allArticles, ...(f3Prev || [])];
   }
+
+  return allArticles;
 }
 
 async function processManual(apiKey, batchName) {
   if (!BATCHES[batchName]) {
     console.log("❌ Invalid manual batch.");
-    return;
+    return [];
   }
 
   let target = { year: currentYear, month: currentMonth, day: currentDay };
@@ -743,7 +602,7 @@ async function processManual(apiKey, batchName) {
     console.log("⚠️ Manual F3 after midnight: using previous day.");
   }
 
-  await processBatch(apiKey, target, batchName);
+  return await processBatch(apiKey, target, batchName);
 }
 
 // =====================================================
@@ -767,10 +626,22 @@ async function fetchNews() {
 
   await deleteOldNews();
 
+  let fetchedArticles = [];
   if (requestedBatch === "AUTO") {
-    await processAuto(apiKey);
+    fetchedArticles = await processAuto(apiKey);
   } else {
-    await processManual(apiKey, requestedBatch);
+    fetchedArticles = await processManual(apiKey, requestedBatch);
+  }
+
+  // Send automatic push notification for the top breaking news item fetched
+  if (fetchedArticles && fetchedArticles.length > 0) {
+    const topNews = fetchedArticles[0];
+    console.log("Sending automatic notification for:", topNews.title);
+    await sendNewsNotification(
+      topNews.title,
+      topNews.description || topNews.summary,
+      topNews.image || topNews.imageUrl
+    );
   }
 
   console.log("=================================");

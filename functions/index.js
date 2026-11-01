@@ -65,3 +65,64 @@ exports.fetchNews = onRequest(async (req, res) => {
         });
     }
 });
+const functions = require("firebase-functions");
+const admin = require("firebase-admin");
+
+if (!admin.apps.length) {
+  admin.initializeApp();
+}
+
+// 1. Endpoint to safely subscribe client tokens to the topic
+exports.subscribeToTopic = functions.https.onRequest(async (req, res) => {
+  // Enable CORS so your frontend can call this function
+  res.set("Access-Control-Allow-Origin", "*");
+  res.set("Access-Control-Allow-Headers", "Content-Type");
+
+  if (req.method === "OPTIONS") {
+    res.status(204).send("");
+    return;
+  }
+
+  const token = req.body.token;
+  if (!token) {
+    res.status(400).send({ error: "Missing registration token" });
+    return;
+  }
+
+  try {
+    // Admin SDK handles topic subscription securely under FCM HTTP v1
+    await admin.messaging().subscribeToTopic(token, "news_updates");
+    console.log("Successfully subscribed token to topic news_updates:", token);
+    res.status(200).send({ success: true, message: "Subscribed to news_updates" });
+  } catch (error) {
+    console.error("Error subscribing token to topic:", error);
+    res.status(500).send({ error: error.message });
+  }
+});
+// 2. Automated Trigger: Fires whenever a new document is created in Firestore
+exports.sendAutomaticNewsNotification = functions.firestore
+  .document("news_cards/{cardId}") // Replace "news_cards" with your exact Firestore collection name
+  .onCreate(async (snapshot, context) => {
+    const newsData = snapshot.data();
+
+    // Payload formatted for FCM HTTP v1
+    const message = {
+      notification: {
+        title: newsData.title || newsData.headline || "TN Politics - Breaking News",
+        body: newsData.summary || newsData.description || "Tap to read the latest updates.",
+      },
+      topic: "news_updates" // Targets all topic subscribers
+    };
+
+    if (newsData.imageUrl || newsData.image) {
+      message.notification.image = newsData.imageUrl || newsData.image;
+    }
+
+    try {
+      const response = await admin.messaging().send(message);
+      console.log("Successfully sent automated push notification:", response);
+      return response;
+    } catch (error) {
+      console.error("Error sending automated notification:", error);
+    }
+  });
