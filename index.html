@@ -301,8 +301,21 @@
 
     <!-- ES Module Script for PWA & Firebase FCM -->
     <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getMessaging, getToken, onMessage, isSupported } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging.js";
-        import { app } from "./firebase-config.js";
+
+        // Direct Firebase Project Configuration
+        const firebaseConfig = {
+    apiKey: "AIzaSyAAkydhw6zWTzXAmF8BNjiAz1TdkJIe1Yg", // Paste your API key here
+    authDomain: "new-tn-politics.firebaseapp.com",
+    projectId: "new-tn-politics",
+    storageBucket: "new-tn-politics.appspot.com",
+    messagingSenderId: "660588395392",
+    appId: "1:660588395392:web:e361f8ad0ca23210645f65"    // Paste your App ID here
+};
+
+        // Explicitly initialize Firebase app instance
+        const firebaseApp = initializeApp(firebaseConfig);
 
         // Global prompt capture for PWA
         window.deferredPrompt = window.deferredPrompt || null;
@@ -318,7 +331,7 @@
             }
         });
 
-        // Initialize Service Worker and FCM token retrieval cleanly
+        // Initialize Service Worker and retrieve FCM token safely
         if ("serviceWorker" in navigator) {
             window.addEventListener("load", async () => {
                 try {
@@ -336,12 +349,12 @@
                             Notification.requestPermission().then((permission) => {
                                 if (permission === "granted") {
                                     console.log("Notification permission granted!");
-                                    fetchFCMToken(app, reg);
+                                    fetchFCMToken(firebaseApp, reg);
                                 }
                             });
                         }, 5000);
                     } else if (Notification.permission === "granted") {
-                        fetchFCMToken(app, reg);
+                        fetchFCMToken(firebaseApp, reg);
                     }
                 } catch (err) {
                     console.warn("Service Worker registration failed:", err);
@@ -349,9 +362,9 @@
             });
         }
 
-        async function fetchFCMToken(firebaseApp, swRegistration) {
+        async function fetchFCMToken(app, swRegistration) {
             try {
-                const messaging = getMessaging(firebaseApp);
+                const messaging = getMessaging(app);
                 const currentToken = await getToken(messaging, {
                     serviceWorkerRegistration: swRegistration,
                     vapidKey: "BOJrGx9TjYoeOxrY-D93F1ztVLgcQ1u507kgBI6YnvNR_EbcdbAVoIaYBB9wzUG58JnBk-5z2SvTrjjQDQS5RB4"
@@ -363,7 +376,7 @@
                     console.warn("No registration token available.");
                 }
 
-                // Foreground message handler
+                // Foreground message listener when website tab is open
                 onMessage(messaging, (payload) => {
                     console.log("Foreground payload received:", payload);
                     new Notification(payload.notification.title, {
