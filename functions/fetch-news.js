@@ -21,17 +21,44 @@ if (!admin.apps.length) {
 const db = admin.firestore();
 
 // Helper function to send push notifications
+// Helper function to send push notifications
 async function sendNewsNotification(title, summary, imageUrl) {
+  const cleanTitle = title || "TN Politics - Breaking News";
+  const cleanBody = (summary || "Tap to read today's latest political updates.").slice(0, 150);
+
   const message = {
     notification: {
-      title: title || "TN Politics - Breaking News",
-      body: summary || "Tap to read today's latest political updates.",
+      title: cleanTitle,
+      body: cleanBody,
+    },
+    android: {
+      priority: "high",
+      notification: {
+        sound: "default",
+        channelId: "news_updates"
+      }
+    },
+    webpush: {
+      headers: {
+        Urgency: "high" // Wakes up Chrome Service Worker in background
+      },
+      notification: {
+        title: cleanTitle,
+        body: cleanBody,
+        icon: "https://new-tn-politics.web.app/logo.png",
+        badge: "https://new-tn-politics.web.app/logo.png",
+        requireInteraction: true // Keeps notification visible in system tray
+      },
+      fcmOptions: {
+        link: "https://new-tn-politics.web.app/" // Required for Web Push click action
+      }
     },
     topic: "news_updates"
   };
 
   if (imageUrl) {
     message.notification.image = imageUrl;
+    message.webpush.notification.image = imageUrl;
   }
 
   try {
